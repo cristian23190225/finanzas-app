@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Mis Finanzas</title>
+
+  <!-- SEGURIDAD: solo se permite código de este mismo sitio.
+       Si alguien logra inyectar un <script>, el navegador lo bloquea. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+
+  <!-- Datos para instalarla como app -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#f5f7fb">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- ============ BARRA DE NAVEGACIÓN ============ -->
+  <nav class="nav" aria-label="Secciones">
+    <button class="nav__btn is-active" data-view="inicio">Inicio</button>
+    <button class="nav__btn" data-view="resumen">Resumen</button>
+    <button class="nav__btn" data-view="prestamos">Préstamos</button>
+    <button class="nav__btn" data-view="deudas">Deudas</button>
+  </nav>
+
+  <!-- ============ PANTALLA: INICIO ============ -->
+  <main id="view-inicio" class="view">
+
+    <!-- Calendario (arriba, centrado) y fecha de hoy debajo -->
+    <section class="calendar" aria-label="Calendario">
+      <div id="calendar-grid" class="calendar__grid"></div>
+      <p id="today-label" class="calendar__today"></p>
+    </section>
+
+    <!-- INGRESOS -->
+    <section class="card">
+      <h2>Ingresos</h2>
+      <form id="form-ingreso" autocomplete="off">
+        <label>Cantidad
+          <input name="amount" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01" required>
+        </label>
+        <button type="submit">Agregar</button>
+      </form>
+      <p class="card__total">Viene del mes anterior: <strong id="income-carry">$0.00</strong></p>
+      <p class="card__total">Disponible para gastar: <strong id="income-available">$0.00</strong></p>
+    </section>
+
+    <!-- AHORROS -->
+    <section class="card">
+      <h2>Ahorros</h2>
+      <form id="form-ahorro" autocomplete="off">
+        <label>Cantidad
+          <input name="amount" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01" required>
+        </label>
+        <label class="check">
+          <input name="fromIncome" type="checkbox" checked>
+          Restar de mis ingresos
+        </label>
+        <button type="submit">Agregar</button>
+      </form>
+      <p class="card__total">Ahorro actual: <strong id="saving-balance">$0.00</strong></p>
+    </section>
+
+    <!-- GASTOS -->
+    <section class="card">
+      <h2>Gastos</h2>
+      <form id="form-gasto" autocomplete="off">
+        <label>Cantidad
+          <input name="amount" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01" required>
+        </label>
+        <label>¿En qué gasté?
+          <input name="note" type="text" maxlength="60" required>
+        </label>
+        <button type="submit">Agregar</button>
+      </form>
+    </section>
+
+    <!-- RETIRO DE AHORROS -->
+    <section class="card">
+      <h2>Retiro de ahorros</h2>
+      <form id="form-retiro" autocomplete="off">
+        <label>Cantidad
+          <input name="amount" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01" required>
+        </label>
+        <button type="submit">Agregar</button>
+      </form>
+    </section>
+
+    <!-- DEUDAS -->
+    <section class="card">
+      <h2>Deudas</h2>
+      <form id="form-deuda" autocomplete="off">
+        <label>¿Qué debo?
+          <input name="concept" type="text" maxlength="60" required>
+        </label>
+        <label>Total a pagar (con intereses)
+          <input name="total" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01" required>
+        </label>
+        <label>Cantidad por pago
+          <input name="payment" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01" required>
+        </label>
+        <label>Cada cuánto pago
+          <select name="frequency" required>
+            <option value="semanal">Cada semana</option>
+            <option value="quincenal">Cada quincena</option>
+            <option value="mensual">Cada mes</option>
+          </select>
+        </label>
+        <label>Fecha del primer pago
+          <input name="firstPayment" type="date" required>
+        </label>
+        <label>Precio de contado (opcional)
+          <input name="cashPrice" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01">
+        </label>
+        <label>Liquidar hoy (opcional)
+          <input name="settleAmount" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01">
+        </label>
+        <button type="submit">Agregar</button>
+      </form>
+    </section>
+
+    <!-- PRÉSTAMOS -->
+    <section class="card">
+      <h2>Préstamos</h2>
+      <form id="form-prestamo" autocomplete="off">
+        <label>¿A quién le presté?
+          <input name="person" type="text" maxlength="60" required>
+        </label>
+        <label>¿Cuánto le presté?
+          <input name="amount" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01" required>
+        </label>
+        <label>Fecha del préstamo
+          <input name="loanDate" type="date" required>
+        </label>
+        <label class="check">
+          <input name="fromIncome" type="checkbox" checked>
+          Restar de mis ingresos
+        </label>
+        <label class="check">
+          <input name="hasInterest" id="loan-has-interest" type="checkbox">
+          Cobrar con interés
+        </label>
+
+        <!-- Estos campos solo se muestran si marcas "Cobrar con interés" -->
+        <div id="loan-interest-fields" hidden>
+          <label>Interés (%)
+            <input name="rate" type="number" inputmode="decimal" min="0.01" max="100" step="0.01">
+          </label>
+          <label>Cada cuánto cobro
+            <select name="frequency">
+              <option value="semanal">Cada semana</option>
+              <option value="quincenal">Cada quincena</option>
+              <option value="mensual">Cada mes</option>
+            </select>
+          </label>
+          <label>Fecha del primer cobro de interés
+            <input name="firstPayment" type="date">
+          </label>
+          <p id="loan-interest-preview" class="interest-preview" aria-live="polite"></p>
+        </div>
+        <button type="submit">Agregar</button>
+      </form>
+    </section>
+
+    <button id="btn-export-pdf" class="btn-secondary" type="button">Descargar PDF</button>
+    <button id="btn-export-xlsx" class="btn-secondary" type="button">Descargar Excel</button>
+  </main>
+
+  <!-- ============ PANTALLA: RESUMEN (la llenamos después) ============ -->
+  <main id="view-resumen" class="view" hidden></main>
+
+  <!-- ============ PANTALLA: PRÉSTAMOS ============ -->
+  <main id="view-prestamos" class="view" hidden></main>
+
+  <!-- ============ PANTALLA: DEUDAS ============ -->
+  <main id="view-deudas" class="view" hidden></main>
+
+  <!-- Un solo script de entrada; los demás se importan desde main.js -->
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

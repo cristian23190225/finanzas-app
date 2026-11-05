@@ -1,0 +1,867 @@
+/* =========================================================
+   1. VARIABLES: los colores y medidas en un solo lugar.
+   Si quieres cambiar el look, cambias solo estas líneas.
+   ========================================================= */
+:root {
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --text: #1f2a44;
+  --muted: #6b7694;
+  --border: #e3e8f2;
+  --accent: #4f7cff;
+  --accent-dark: #3b66e6;
+  --accent-soft: #eaf0ff;
+  --radius: 0.9rem;
+  --shadow: 0 2px 8px rgba(31, 42, 68, 0.06);
+}
+
+/* =========================================================
+   2. BASE
+   ========================================================= */
+
+/* El tamaño base crece con la pantalla: casi todo lo demás
+   está en "rem", así que letras, botones y espacios escalan juntos.
+   Teléfono pequeño ≈ 15px · iPhone ≈ 16px · tableta ≈ 19px · pantalla grande = 22px */
+html {
+  font-size: clamp(15px, 14px + 0.6vw, 22px);
+  -webkit-text-size-adjust: 100%; /* evita que el iPhone agrande el texto al girarlo */
+  text-size-adjust: 100%;
+  overflow-x: hidden;             /* la página nunca se mueve hacia los lados */
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Hace que el atributo "hidden" del HTML siempre oculte el elemento */
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  min-width: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.4;
+  /* Respeta la muesca y las barras del iPhone (también en horizontal) */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* =========================================================
+   3. NAVEGACIÓN (los 4 botones de arriba)
+   ========================================================= */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav__btn {
+  flex: 1 1 0;
+  min-width: 0;            /* permite que el botón se encoja en pantallas chicas */
+  max-width: 11rem;
+  min-height: 2.75rem;     /* zona táctil cómoda */
+  padding: 0.5rem 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* si no cabe, corta con "…" en vez de ensanchar la página */
+  cursor: pointer;
+}
+
+.nav__btn.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+/* =========================================================
+   4. PANTALLAS
+   ========================================================= */
+.view {
+  width: 100%;
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+/* =========================================================
+   5. CALENDARIO (centrado)
+   ========================================================= */
+.calendar {
+  width: min(100%, 22rem);
+  margin: 0 auto 1rem;
+  padding: 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.15rem;
+}
+
+.calendar__title {
+  grid-column: 1 / -1;
+  margin-bottom: 0.4rem;
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+/* Solo la primera letra en mayúscula: "Noviembre de 2026" */
+.calendar__title::first-letter,
+.calendar__today::first-letter {
+  text-transform: uppercase;
+}
+
+.calendar__weekday {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.calendar__day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  font-size: 0.9rem;
+}
+
+/* El día de hoy: círculo azul */
+.calendar__day.is-today {
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.calendar__today {
+  margin: 0.7rem 0 0;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* =========================================================
+   6. TARJETAS (cada recuadro: Ingresos, Gastos, etc.)
+   ========================================================= */
+.card {
+  min-width: 0;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.card h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+}
+
+.card__total {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.card__total strong {
+  color: var(--text);
+}
+
+/* =========================================================
+   7. FORMULARIOS: cada campo uno debajo del otro
+   ========================================================= */
+form,
+#loan-interest-fields {
+  display: flex;
+  flex-direction: column;   /* esto pone todo en columna */
+  gap: 0.75rem;
+}
+
+/* Cada etiqueta + su cuadro: el texto arriba y el cuadro debajo */
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+input,
+select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 2.75rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: #ffffff;
+  color: var(--text);
+  /* Nunca menos de 16px: así el iPhone no hace zoom solo al tocar un cuadro */
+  font-size: max(16px, 1rem);
+  font-family: inherit;
+}
+
+input:focus,
+select:focus {
+  outline: 2px solid var(--accent-soft);
+  border-color: var(--accent);
+}
+
+/* Los campos de fecha se ven bien y del mismo tamaño en iPhone */
+input[type="date"] {
+  text-align: left;
+}
+
+/* La casilla "Cobrar con interés" va en una sola fila */
+label.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text);
+}
+
+label.check input {
+  width: 1.25rem;
+  height: 1.25rem;
+  min-height: 0;
+  padding: 0;
+}
+
+/* =========================================================
+   8. BOTONES
+   ========================================================= */
+button[type="submit"] {
+  min-height: 2.9rem;
+  padding: 0.7rem;
+  border: none;
+  border-radius: 0.65rem;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button[type="submit"]:active {
+  background: var(--accent-dark);
+}
+
+.btn-secondary {
+  display: block;
+  width: 100%;
+  min-height: 2.9rem;
+  margin-bottom: 0.65rem;
+  padding: 0.7rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.65rem;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-secondary:active {
+  background: var(--accent-soft);
+}
+
+/* =========================================================
+   9. AVISOS (los mensajes que aparecen abajo: "Ingreso agregado")
+   ========================================================= */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  z-index: 20;
+  max-width: min(90vw, 28rem);
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: var(--text);
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: center;
+  box-shadow: var(--shadow);
+  /* Oculto por defecto; "is-visible" lo muestra con una pequeña animación */
+  opacity: 0;
+  transform: translate(-50%, 1rem);
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.toast--error {
+  background: #c0392b;
+}
+
+/* =========================================================
+   10. ADAPTACIÓN A DIFERENTES PANTALLAS
+   ========================================================= */
+
+/* Teléfonos muy pequeños (360 px o menos) */
+@media (max-width: 360px) {
+  .nav {
+    gap: 0.3rem;
+    padding: 0.5rem;
+  }
+
+  .nav__btn {
+    font-size: 0.72rem;
+  }
+
+  .view {
+    padding: 0.75rem;
+  }
+}
+
+/* Tabletas y pantallas grandes (768 px o más) */
+@media (min-width: 768px) {
+  .view {
+    max-width: 60rem;
+    padding: 1.5rem;
+  }
+
+  /* Inicio: calendario arriba al centro y los recuadros en dos columnas */
+  #view-inicio {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    align-items: start;
+  }
+
+  #view-inicio .calendar {
+    grid-column: 1 / -1;
+    width: min(100%, 24rem);
+  }
+
+  #view-inicio .calendar,
+  #view-inicio .card,
+  #view-inicio .btn-secondary {
+    margin-bottom: 0;
+  }
+}
+
+/* =========================================================
+   VISTA PREVIA DEL INTERÉS (en Préstamos y en las ventanitas)
+   ========================================================= */
+.interest-preview {
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.65rem;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/* =========================================================
+   TABLAS = TARJETAS QUE SE ADAPTAN (sin barra de desplazamiento)
+   Cada fila (<tr>) es una tarjeta. Sus datos se acomodan en una
+   cuadrícula: en teléfono caben 2 columnas, en pantallas grandes
+   hasta 4. La etiqueta de cada dato sale de data-label.
+   ========================================================= */
+.table-wrap {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.table,
+.table tbody {
+  display: block;
+  width: 100%;
+}
+
+.table tbody tr {
+  display: grid;
+  /* Mínimo 8rem por columna y máximo 4 columnas */
+  grid-template-columns: repeat(auto-fit, minmax(max(8rem, calc((100% - 3rem) / 4)), 1fr));
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.table tbody tr:last-child {
+  margin-bottom: 0;
+}
+
+/* Cada dato: la etiqueta arriba y el valor debajo */
+.table td {
+  display: block;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  text-align: left;
+  font-size: 0.95rem;
+  font-weight: 600;
+  overflow-wrap: break-word;
+}
+
+.table td::before {
+  content: attr(data-label);
+  display: block;
+  margin-bottom: 0.1rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* Cantidades sin partirse y con dígitos alineados */
+.table .num {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Precio e intereses que faltan (compras a crédito): resaltados */
+.table td.cell-credit {
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.55rem;
+  background: var(--accent-soft);
+}
+
+/* Arriba de la tarjeta: nombre de la deuda y su estado */
+.table td.cell-title {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.table td.cell-title::before {
+  content: none;
+}
+
+.cell-title__name {
+  flex: 1 1 8rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Abajo de la tarjeta: los botones */
+.table td.actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding-top: 0.25rem;
+}
+
+.table td.actions::before {
+  content: none;
+}
+
+.table td.actions .btn-small {
+  flex: 1 1 8rem;
+}
+
+/* =========================================================
+   ETIQUETAS DE ESTADO Y BOTONES PEQUEÑOS
+   ========================================================= */
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge--late {
+  background: #fdecea;
+  color: #b3261e;
+  white-space: normal;
+}
+
+.badge--today {
+  background: #fff4d6;
+  color: #8a5a00;
+}
+
+.btn-small {
+  min-height: 2.5rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.55rem;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Botón de contorno (Abonar a capital, Liquidar) */
+.btn-small--outline {
+  background: var(--surface);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-small--ghost {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+/* Casilla suelta dentro de una tarjeta */
+.card > label.check {
+  margin-top: 0.75rem;
+}
+
+/* =========================================================
+   PANTALLA DEUDAS: tarjeta de arriba (deudas | ingresos)
+   ========================================================= */
+.debts-top {
+  display: flex;
+  flex-wrap: wrap;          /* si de plano no caben lado a lado, se apilan */
+  gap: 1rem 1.5rem;
+}
+
+.debts-top__side {
+  flex: 1 1 9rem;
+  min-width: 0;
+}
+
+.debts-top__side > label.check {
+  margin-top: 0.75rem;
+}
+
+/* =========================================================
+   VENTANITAS (Abonar a capital y Liquidar)
+   ========================================================= */
+.dialog {
+  width: min(92vw, 26rem);
+  max-height: 90vh;
+  margin: auto;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 8px 30px rgba(31, 42, 68, 0.25);
+}
+
+.dialog::backdrop {
+  background: rgba(31, 42, 68, 0.45);
+}
+
+.dialog h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.dialog .card__total {
+  margin: 0;
+}
+
+.dialog .btn-secondary {
+  margin-bottom: 0;
+}
+
+.dialog__error {
+  margin: 0;
+  color: #b3261e;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.dialog__error:empty {
+  display: none;
+}
+
+/* =========================================================
+   BOTONES DE SELECCIÓN (¿A dónde va este dinero?)
+   Cada opción es un botón grande y fácil de tocar.
+   ========================================================= */
+.choice-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.choice-group legend {
+  margin-bottom: 0.5rem;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+label.choice {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 2.9rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+label.choice input {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+/* La opción elegida se resalta */
+label.choice:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Se ve el foco cuando se navega con teclado */
+label.choice:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* =========================================================
+   PANTALLA RESUMEN
+   ========================================================= */
+
+/* Selector de mes: ‹  Noviembre de 2026  › */
+.month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.month-nav__label {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.month-nav .btn-small {
+  flex: none;
+  min-width: 3rem;
+  font-size: 1.2rem;
+}
+
+.btn-small:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Renglones "texto ....... cantidad" */
+.sum-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sum-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.sum-row span {
+  min-width: 0;
+}
+
+.sum-row strong {
+  flex: none;
+  color: var(--text);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.sum-row--in strong {
+  color: #1e7b45;
+}
+
+.sum-row--out strong {
+  color: #b3261e;
+}
+
+.sum-row--total {
+  margin-top: 0.3rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.sum-row--total strong {
+  font-size: 1.2rem;
+}
+
+/* Listas de movimientos y de "lo que viene" */
+.move-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.move {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.move:last-child {
+  border-bottom: none;
+}
+
+.move__main {
+  min-width: 0;
+}
+
+.move__title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.move__sub {
+  color: var(--muted);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.move__sub--late {
+  color: #b3261e;
+  font-weight: 600;
+}
+
+.move__amount {
+  flex: none;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.move__amount--in {
+  color: #1e7b45;
+}
+
+.move__amount--out {
+  color: #b3261e;
+}
+
+/* En pantallas grandes: los bloques van en dos columnas */
+@media (min-width: 768px) {
+  #view-resumen {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    align-items: start;
+  }
+
+  #view-resumen .card,
+  #view-resumen .month-nav {
+    margin-bottom: 0;
+  }
+
+  #view-resumen .span-all {
+    grid-column: 1 / -1;
+  }
+}
+
+/* =========================================================
+   ANIMACIÓN AL CAMBIAR DE PANTALLA (botones o deslizando)
+   La pantalla nueva entra desde el lado hacia donde vas.
+   ========================================================= */
+@keyframes view-in-next {
+  from {
+    opacity: 0;
+    transform: translateX(2rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes view-in-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-2rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.view--in-next {
+  animation: view-in-next 0.22s ease-out;
+}
+
+.view--in-prev {
+  animation: view-in-prev 0.22s ease-out;
+}
+
+/* Si el teléfono tiene activado "reducir movimiento", no se anima */
+@media (prefers-reduced-motion: reduce) {
+  .view--in-next,
+  .view--in-prev {
+    animation: none;
+  }
+}
