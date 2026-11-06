@@ -6,7 +6,7 @@
    hacia un lado (en el teléfono).
    ========================================================= */
 
-import { initCalendar, onDayChange } from './calendar.js';
+import { activeDate, initCalendar, onActiveDateChange, onDayChange } from './calendar.js';
 import { initDebts, renderDebts } from './debts.js';
 import { initExport } from './export.js';
 import { initLoans, renderLoans } from './loans.js';
@@ -15,7 +15,7 @@ import { initTheme } from './theme.js';
 import { renderSettings } from './settings.js';
 import { renderSummary } from './summary.js';
 import { initTransactions } from './transactions.js';
-import { clear, el, todayISO } from './utils.js';
+import { clear, el } from './utils.js';
 
 /* =========================================================
    1. NAVEGACIÓN
@@ -240,8 +240,11 @@ function init() {
   initLoans();
   initExport();
 
-  fillTodayDates(todayISO());
-  onDayChange(fillTodayDates);
+  fillTodayDates(activeDate());
+  // Si cambia el día real (medianoche) o eliges otro día en el calendario,
+  // la "Fecha del préstamo" se actualiza (si no la habías cambiado a mano)
+  onDayChange((_today, previous) => fillTodayDates(activeDate(), previous));
+  onActiveDateChange((active, previous) => fillTodayDates(active, previous));
 
   // Le pide al teléfono que proteja los datos guardados
   requestPersistence();

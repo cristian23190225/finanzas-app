@@ -6,10 +6,10 @@
    ("Ahorro actual" y "Disponible para gastar").
    ========================================================= */
 
-import { onDayChange } from './calendar.js';
+import { activeDate, onDayChange } from './calendar.js';
 import { addItem, getItems } from './storage.js';
 import { showToast } from './ui.js';
-import { cleanText, formatMoney, monthKey, parseAmount, roundMoney, todayISO } from './utils.js';
+import { cleanText, formatMoney, formatShortDate, monthKey, parseAmount, roundMoney, todayISO } from './utils.js';
 
 // Una línea por formulario: su id en el HTML, qué tipo de movimiento
 // crea y qué mensaje se muestra al guardarse.
@@ -163,11 +163,13 @@ function handleSubmit(event, config) {
     }
   }
 
+  // Fecha del movimiento: hoy, o el día pasado que elegiste en el calendario
+  const date = activeDate();
   const saved = addItem('transactions', {
     type: config.type,
     amount,
     note,
-    date: todayISO(),
+    date,
     fromIncome,
   });
   if (!saved) {
@@ -181,7 +183,8 @@ function handleSubmit(event, config) {
   let extra = '';
   if (fromIncome || config.type === 'gasto') extra = ' (restado de tus ingresos)';
   else if (config.type === 'retiro') extra = ' (sumado a tus ingresos)';
-  showToast(`${config.success}: ${formatMoney(amount)}${extra}`);
+  const dateNote = date === todayISO() ? '' : ` · ${formatShortDate(date)}`;
+  showToast(`${config.success}: ${formatMoney(amount)}${extra}${dateNote}`);
 }
 
 /* =========================================================

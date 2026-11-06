@@ -237,9 +237,32 @@ select:focus {
   border-color: var(--accent);
 }
 
-/* Los campos de fecha se ven bien y del mismo tamaño en iPhone */
+/* Los campos de fecha se ven bien y del mismo tamaño en iPhone.
+   Safari les pone su propio tamaño, ancho y centrado: aquí se igualan
+   a los demás cuadros. */
 input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 2.75rem;
+  margin: 0;
   text-align: left;
+  line-height: normal;
+}
+
+/* El texto de la fecha: pegado a la izquierda, como en los demás cuadros */
+input[type="date"]::-webkit-date-and-time-value {
+  min-height: 1.3em;
+  margin: 0;
+  text-align: left;
+}
+
+input[type="date"]::-webkit-datetime-edit {
+  padding: 0;
 }
 
 /* La casilla "Cobrar con interés" va en una sola fila */
@@ -935,9 +958,133 @@ label.choice:has(input:focus-visible) {
   flex: 1 1 auto;
 }
 
-.btn-small--outline {
-  background: var(--surface);
+/* =========================================================
+   CALENDARIO: elegir un día pasado + aviso arriba
+   ========================================================= */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar .nav {
+  position: static;
+  border-bottom: none;
+}
+
+.date-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem 0.7rem;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.date-banner__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+/* El contador: "Vuelves a hoy en 4:32" */
+.date-banner__timer {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums; /* los números no "bailan" al cambiar */
+}
+
+/* Barra delgada abajo del aviso: empieza llena y se vacía en 5 minutos */
+.date-banner__bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--border);
+}
+
+.date-banner__fill {
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left center;
+  transition: transform 1s linear;
+}
+
+.date-banner[hidden] {
+  display: none;
+}
+
+.date-banner__text {
+  min-width: 0;
+}
+
+.date-banner .btn-small {
+  flex: none;
+  min-height: 2.2rem;
+}
+
+.calendar__head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.calendar__head .calendar__title {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.calendar__arrow {
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
   color: var(--accent);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.calendar__arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Cada día es un botón: se le quita el aspecto de botón */
+.calendar__day {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+/* El día que elegiste: aro azul (el día de hoy sigue en azul sólido) */
+.calendar__day.is-selected {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 2px var(--accent);
+  font-weight: 700;
+}
+
+/* Días que no se pueden elegir: futuros o antes de tu primer movimiento */
+.calendar__day.is-disabled {
+  color: var(--muted);
+  opacity: 0.35;
+  cursor: default;
 }
 
 /* =========================================================

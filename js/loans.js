@@ -12,6 +12,7 @@
      interés por cobro baja.
    ========================================================= */
 
+import { activeDate } from './calendar.js';
 import { addItem, getItems, removeItem, updateItem } from './storage.js';
 import { getAvailableIncome, hasEnoughIncome, notEnoughIncomeMessage, updateDisplays } from './transactions.js';
 import { showToast } from './ui.js';
@@ -201,7 +202,7 @@ function handleSubmit(event) {
       type: 'prestamo',
       amount,
       note: person,
-      date: todayISO(),
+      date: activeDate(),
       fromIncome: true,
     });
     if (!movement) {
@@ -214,7 +215,7 @@ function handleSubmit(event) {
 
   // Dejar el formulario listo para el siguiente préstamo
   form.reset();
-  form.elements.loanDate.value = todayISO(); // reset() la deja vacía; la volvemos a poner
+  form.elements.loanDate.value = activeDate(); // reset() la deja vacía; la volvemos a poner
   syncInterestFields(form);                  // reset() no avisa a la casilla, lo hacemos a mano
 
   let message = `Préstamo agregado: ${person}, ${formatMoney(amount)}`;
@@ -300,7 +301,7 @@ function openInterestDialog(loan, container, defaultToIncome) {
     const amount = info.interestNext;
     const toIncome = dest.getValue() === 'income';
     const toSavings = dest.getValue() === 'savings';
-    const today = todayISO();
+    const today = activeDate(); // hoy, o el día pasado que elegiste en el calendario
 
     // 1) Movimiento del cobro en el historial
     const movement = addItem('transactions', {
@@ -467,7 +468,7 @@ function openPrincipalDialog(loan, container, defaultToIncome) {
     const destination = dest.getValue();
     const toIncome = destination === 'income';
     const toSavings = destination === 'savings';
-    const today = todayISO();
+    const today = activeDate(); // hoy, o el día pasado que elegiste en el calendario
 
     // 1) Movimiento del cobro en el historial
     const movement = addItem('transactions', {

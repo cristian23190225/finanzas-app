@@ -24,12 +24,25 @@
 <body>
 
   <!-- ============ BARRA DE NAVEGACIÓN ============ -->
-  <nav class="nav" aria-label="Secciones">
-    <button class="nav__btn is-active" data-view="inicio">Inicio</button>
-    <button class="nav__btn" data-view="resumen">Resumen</button>
-    <button class="nav__btn" data-view="prestamos">Préstamos</button>
-    <button class="nav__btn" data-view="deudas">Deudas</button>
-  </nav>
+  <!-- Barra de arriba: botones de pantallas + aviso cuando registras en un día pasado -->
+  <div class="topbar">
+    <nav class="nav" aria-label="Secciones">
+      <button class="nav__btn is-active" data-view="inicio">Inicio</button>
+      <button class="nav__btn" data-view="resumen">Resumen</button>
+      <button class="nav__btn" data-view="prestamos">Préstamos</button>
+      <button class="nav__btn" data-view="deudas">Deudas</button>
+    </nav>
+
+    <div id="date-banner" class="date-banner" role="region" aria-label="Día en el que registras" hidden>
+      <div class="date-banner__info">
+        <span id="date-banner-text" class="date-banner__text"></span>
+        <span id="date-banner-timer" class="date-banner__timer" aria-hidden="true"></span>
+      </div>
+      <button id="date-banner-today" class="btn-small" type="button">Volver a hoy</button>
+      <!-- Barra que se va vaciando mientras corre el tiempo -->
+      <div class="date-banner__bar" aria-hidden="true"><div id="date-banner-fill" class="date-banner__fill"></div></div>
+    </div>
+  </div>
 
   <!-- ============ PANTALLA: INICIO ============ -->
   <main id="view-inicio" class="view">

@@ -15,6 +15,7 @@
        precio de contado, el total y el pago de cada periodo.
    ========================================================= */
 
+import { activeDate } from './calendar.js';
 import { addItem, getItems, removeItem, updateItem } from './storage.js';
 import { getAvailableIncome, hasEnoughIncome, notEnoughIncomeMessage, updateDisplays } from './transactions.js';
 import { showToast } from './ui.js';
@@ -264,7 +265,7 @@ function handleSubmit(event) {
     total,
     payment,
     frequency,
-    date: todayISO(),
+    date: activeDate(),
     firstPaymentDate,
     cashPrice,
     periodRate,
@@ -337,7 +338,7 @@ function openPaymentDialog(debt, container, defaultFromIncome) {
     event.preventDefault();
 
     const fromIncome = income.box.checked;
-    const today = todayISO();
+    const today = activeDate(); // hoy, o el día pasado que elegiste en el calendario
 
     // No se puede restar de tus ingresos más de lo que tienes
     if (fromIncome && !hasEnoughIncome(info.nextAmount)) return fail(notEnoughIncomeMessage(true));
@@ -644,7 +645,7 @@ function openCapitalDialog(debt, container, defaultFromIncome) {
     }
 
     const fromIncome = income.box.checked;
-    const today = todayISO();
+    const today = activeDate(); // hoy, o el día pasado que elegiste en el calendario
 
     // No se puede restar de tus ingresos más de lo que tienes
     if (fromIncome && !hasEnoughIncome(extra)) return fail(notEnoughIncomeMessage(true));
@@ -796,7 +797,7 @@ function openSettleDialog(debt, container, defaultFromIncome) {
       type: 'pago_deuda',
       amount,
       note: `Liquidación: ${debt.concept}`,
-      date: todayISO(),
+      date: activeDate(),
       fromIncome,
     });
     if (!movement) return fail('No se pudo guardar. Revisa el espacio de tu teléfono.');
