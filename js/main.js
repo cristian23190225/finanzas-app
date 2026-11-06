@@ -10,6 +10,7 @@ import { activeDate, initCalendar, onActiveDateChange, onDayChange } from './cal
 import { initDebts, renderDebts } from './debts.js';
 import { initExport } from './export.js';
 import { initLoans, renderLoans } from './loans.js';
+import { initPwa } from './pwa.js';
 import { requestPersistence } from './storage.js';
 import { initTheme } from './theme.js';
 import { renderSettings } from './settings.js';
@@ -248,6 +249,9 @@ function init() {
 
   // Le pide al teléfono que proteja los datos guardados
   requestPersistence();
+
+  // Modo sin internet y avisos de versión nueva (si falla, la app sigue funcionando normal)
+  initPwa().catch((error) => console.error('Error al iniciar el modo sin internet:', error));
 }
 
 init();

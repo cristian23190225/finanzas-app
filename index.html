@@ -42,6 +42,15 @@
       <!-- Barra que se va vaciando mientras corre el tiempo -->
       <div class="date-banner__bar" aria-hidden="true"><div id="date-banner-fill" class="date-banner__fill"></div></div>
     </div>
+
+    <!-- Aviso cuando hay una versión nueva de la app (lo muestra pwa.js) -->
+    <div id="update-banner" class="date-banner update-banner" role="region" aria-label="Actualización de la app" hidden>
+      <div class="date-banner__info">
+        <span class="date-banner__timer">Hay una versión nueva de la app.</span>
+        <span class="date-banner__text">Tus datos no se tocan.</span>
+      </div>
+      <button id="update-banner-button" class="btn-small" type="button">Actualizar</button>
+    </div>
   </div>
 
   <!-- ============ PANTALLA: INICIO ============ -->

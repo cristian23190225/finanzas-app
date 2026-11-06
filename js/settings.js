@@ -4,12 +4,15 @@
      - Apariencia: modo claro u oscuro.
      - Restaurar mis datos: vuelve a cargar tus movimientos, deudas y
        préstamos desde un PDF o Excel que descargaste de esta app.
+     - Aplicación: versión instalada, estado sin internet y actualizar.
+     - Borrar mis datos.
    ========================================================= */
 
 import { BackupError, readBackupFile } from './backup.js';
 import { refreshCalendar } from './calendar.js';
 import { downloadExcel, downloadPdf } from './export.js';
 import { clearAllData, getItems, mergeBackup, previewMerge } from './storage.js';
+import { PwaError, getAppInfo, updateApp } from './pwa.js';
 import { chooseTheme, getCurrentTheme } from './theme.js';
 import { updateDisplays } from './transactions.js';
 import { showToast } from './ui.js';
@@ -153,7 +156,78 @@ function buildRestoreCard() {
 }
 
 /* =========================================================
-   3. BORRAR MIS DATOS
+   3. APLICACIÓN: versión, sin internet y actualizar
+   ========================================================= */
+
+/** Texto del estado "sin internet" según lo que diga el service worker. */
+function offlineText(info) {
+  if (!info.supported) return 'Sin internet: este navegador no lo permite.';
+  if (!info.ready) return 'Sin internet: se está preparando. Cierra la app y ábrela de nuevo con internet.';
+  if (info.offlineReady) return 'Sin internet: listo ✓ La app abre aunque no tengas conexión.';
+  return 'Sin internet: faltan archivos por guardar. Toca el botón de abajo con internet.';
+}
+
+function buildAppCard() {
+  const card = el('section', '', 'card');
+  card.appendChild(el('h2', 'Aplicación'));
+
+  const versionLine = el('p', 'Versión: …', 'card__total');
+  const offlineLine = el('p', 'Sin internet: revisando…', 'card__total');
+  const updateLine = el('p', '', 'card__total');
+  updateLine.hidden = true;
+  card.append(versionLine, offlineLine, updateLine);
+
+  // Se llenan cuando el service worker contesta
+  getAppInfo()
+    .then((info) => {
+      versionLine.textContent = info.ready ? `Versión: ${info.version}` : 'Versión: no disponible todavía';
+      offlineLine.textContent = offlineText(info);
+      if (info.updateWaiting) {
+        updateLine.textContent = 'Hay una versión nueva lista: toca el botón de abajo para instalarla.';
+        updateLine.hidden = false;
+      }
+    })
+    .catch(() => {
+      versionLine.textContent = 'Versión: no disponible';
+      offlineLine.textContent = 'Sin internet: no se pudo revisar.';
+    });
+
+  card.appendChild(
+    el(
+      'p',
+      'Úsalo si la app se quedó en una versión vieja o algo no carga bien. Necesitas internet. Tus datos no se tocan.',
+      'card__total'
+    )
+  );
+
+  const button = el('button', 'Actualizar archivos de la app', 'btn-secondary');
+  button.type = 'button';
+  button.addEventListener('click', async () => {
+    const label = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Buscando actualización…';
+    try {
+      const result = await updateApp();
+      if (result === 'updating') {
+        showToast('Instalando la versión nueva… la app se reiniciará sola.');
+      } else {
+        showToast('Ya tienes la última versión. Se volvieron a descargar los archivos; reiniciando…');
+        setTimeout(() => window.location.reload(), 1500);
+      }
+    } catch (error) {
+      console.error('Error al actualizar la app:', error);
+      showToast(error instanceof PwaError ? error.message : 'No se pudo actualizar. Intenta de nuevo.', 'error');
+    } finally {
+      button.disabled = false;
+      button.textContent = label;
+    }
+  });
+  card.appendChild(button);
+  return card;
+}
+
+/* =========================================================
+   4. BORRAR MIS DATOS
    ========================================================= */
 
 /** Cuántos registros hay guardados ahora. */
@@ -287,13 +361,14 @@ function buildDeleteCard() {
 }
 
 /* =========================================================
-   4. PANTALLA
+   5. PANTALLA
    ========================================================= */
 
 export function renderSettings(container) {
   clear(container);
   container.appendChild(buildThemeCard());
   container.appendChild(buildRestoreCard());
+  container.appendChild(buildAppCard());
   container.appendChild(buildDeleteCard());
 
   const back = el('button', '← Volver a Inicio', 'btn-secondary');

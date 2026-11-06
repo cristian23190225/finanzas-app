@@ -1115,6 +1115,11 @@ label.choice:has(input:focus-visible) {
   cursor: default;
 }
 
+/* Aviso de versión nueva: igual que el aviso de día, sin barra de tiempo */
+.update-banner {
+  padding-bottom: 0.5rem;
+}
+
 /* =========================================================
    MODO OSCURO
    theme.js pone data-theme="dark" en <html>. Casi todo cambia solo
