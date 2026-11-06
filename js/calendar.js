@@ -322,6 +322,17 @@ function comeBack() {
   tick();
 }
 
+/** Vuelve a dibujar el calendario (por ejemplo, tras restaurar datos: cambia el primer movimiento). */
+export function refreshCalendar() {
+  // Si el día elegido ya no es válido (por ejemplo, se borraron los datos), se vuelve a hoy
+  if (selectedDay !== null && selectedDay < firstMovementDate(todayISO())) {
+    setSelectedDay(null, 'manual');
+    return;
+  }
+  renderCalendar();
+  updateBanner();
+}
+
 /** Arranca el calendario. Se llama una sola vez desde main.js. */
 export function initCalendar() {
   shownDay = todayISO();

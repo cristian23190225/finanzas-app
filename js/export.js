@@ -8,8 +8,10 @@
    Solo LEE los datos: no guarda ni cambia nada.
    ========================================================= */
 
+import { BACKUP_SHEET, backupExcelCells, createBackupPayload, embedBackupInPdf } from './backup.js';
 import { describeDebt } from './debts.js';
 import { describeLoan } from './loans.js';
+import { loadLib } from './libs.js';
 import { getItems } from './storage.js';
 import { getAvailableIncome, getSavingBalance, incomeEffect } from './transactions.js';
 import { showToast } from './ui.js';
@@ -37,36 +39,17 @@ const TYPE_LABELS = {
 const monthFormatter = new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' });
 
 /* =========================================================
-   1. CARGA DE LIBRERÍAS (solo cuando hacen falta)
+   1. LIBRERÍAS (se cargan solo cuando hacen falta, ver libs.js)
    ========================================================= */
 
-const loaded = new Map();
-
-/** Carga un archivo de lib/ una sola vez. La ruta se calcula desde este archivo (js/ -> lib/). */
-function loadScript(fileName) {
-  if (!loaded.has(fileName)) {
-    const promise = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = new URL(`../lib/${fileName}`, import.meta.url).href;
-      script.onload = resolve;
-      script.onerror = () => reject(new Error(`No se pudo cargar lib/${fileName}`));
-      document.head.appendChild(script);
-    });
-    // Si falla, se permite intentarlo otra vez
-    promise.catch(() => loaded.delete(fileName));
-    loaded.set(fileName, promise);
-  }
-  return loaded.get(fileName);
-}
-
 async function loadPdfLibraries() {
-  await loadScript('jspdf.umd.min.js');
-  await loadScript('jspdf.plugin.autotable.min.js'); // se engancha a jsPDF al cargarse
+  await loadLib('jspdf.umd.min.js');
+  await loadLib('jspdf.plugin.autotable.min.js'); // se engancha a jsPDF al cargarse
   return window.jspdf.jsPDF;
 }
 
 async function loadExcelLibrary() {
-  await loadScript('xlsx-writer.min.js');
+  await loadLib('xlsx-writer.min.js');
   return window.writeXlsxSync;
 }
 
@@ -195,15 +178,16 @@ function isTouchDevice() {
   return /iPhone|iPad|iPod|Android/i.test(ua) || iPadOS;
 }
 
+/** Devuelve true si el archivo se entregó, o false si cerraste la hoja de Compartir sin guardarlo. */
 async function deliver(blob, fileName, mimeType) {
   const file = new File([blob], fileName, { type: mimeType });
 
   if (isTouchDevice() && navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: fileName });
-      return;
+      return true;
     } catch (error) {
-      if (error && error.name === 'AbortError') return; // cerraste la hoja de compartir
+      if (error && error.name === 'AbortError') return false; // cerraste la hoja de compartir
       // Cualquier otro fallo: se intenta la descarga normal
     }
   }
@@ -216,6 +200,7 @@ async function deliver(blob, fileName, mimeType) {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60 * 1000);
+  return true;
 }
 
 function fileName(extension) {
@@ -245,8 +230,11 @@ async function buildPdf(report) {
   doc.setFontSize(10);
   doc.setTextColor(110);
   doc.text(`Reporte al ${formatShortDate(report.today)}`, PDF_MARGIN, y);
+  y += 4.5;
+  doc.setFontSize(8);
+  doc.text('Este PDF incluye un respaldo: puedes restaurar tus datos en la app (Ajustes > Restaurar mis datos).', PDF_MARGIN, y);
   doc.setTextColor(0);
-  y += 8;
+  y += 7;
 
   /** Título de sección; salta de página si queda muy poco espacio. */
   const heading = (text) => {
@@ -390,6 +378,9 @@ async function buildPdf(report) {
     doc.text(`Página ${i} de ${pages}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
   }
 
+  // Respaldo completo de tus datos, escondido dentro del PDF (sirve para restaurar)
+  embedBackupInPdf(doc, await createBackupPayload());
+
   return doc.output('blob');
 }
 
@@ -467,11 +458,18 @@ async function buildExcel(report) {
 
   const widths = (list) => list.map((width) => ({ width }));
 
+  // Hoja "Respaldo": copia completa de tus datos para poder restaurarlos
+  const backupRows = [
+    [text('Respaldo de Mis Finanzas. No borres ni cambies esta hoja: sirve para restaurar tus datos en la app (Ajustes > Restaurar mis datos).')],
+    ...backupExcelCells(await createBackupPayload()).map((cell) => [{ value: cell, type: String }]),
+  ];
+
   const sheets = [
     { sheet: 'Resumen', data: summaryRows, columns: widths([30, 18, 18, 18, 22]), stickyRowsCount: 1 },
     { sheet: 'Movimientos', data: movementRows, columns: widths([13, 20, 32, 16, 20]), stickyRowsCount: 1 },
     { sheet: 'Deudas', data: debtRows, columns: widths([28, 16, 14, 16, 14, 18, 18, 14, 14, 14]), stickyRowsCount: 1 },
     { sheet: 'Préstamos', data: loanRows, columns: widths([24, 13, 14, 11, 18, 14, 14, 16, 14, 14]), stickyRowsCount: 1 },
+    { sheet: BACKUP_SHEET, data: backupRows, columns: widths([60]) },
   ];
 
   return writeXlsx(sheets, {}); // devuelve una promesa con el archivo
@@ -509,14 +507,19 @@ function wireButton(id, busyText, run) {
   });
 }
 
-export function initExport() {
-  wireButton('btn-export-pdf', 'Preparando PDF…', async () => {
-    const blob = await buildPdf(buildReport());
-    await deliver(blob, fileName('pdf'), 'application/pdf');
-  });
+/** Genera y entrega el PDF. Devuelve true si se guardó/compartió. */
+export async function downloadPdf() {
+  const blob = await buildPdf(buildReport());
+  return deliver(blob, fileName('pdf'), 'application/pdf');
+}
 
-  wireButton('btn-export-xlsx', 'Preparando Excel…', async () => {
-    const blob = await buildExcel(buildReport());
-    await deliver(blob, fileName('xlsx'), XLSX_MIME);
-  });
+/** Genera y entrega el Excel. Devuelve true si se guardó/compartió. */
+export async function downloadExcel() {
+  const blob = await buildExcel(buildReport());
+  return deliver(blob, fileName('xlsx'), XLSX_MIME);
+}
+
+export function initExport() {
+  wireButton('btn-export-pdf', 'Preparando PDF…', downloadPdf);
+  wireButton('btn-export-xlsx', 'Preparando Excel…', downloadExcel);
 }

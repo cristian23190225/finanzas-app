@@ -1,0 +1,4 @@
+jspdf.umd.min.js              jsPDF 4.2.1 (MIT)
+jspdf.plugin.autotable.min.js jsPDF-AutoTable 5.0.9 (MIT)
+xlsx-writer.min.js            write-excel-file 4.1.1 + fflate, sin Web Workers (MIT)
+backup-tools.min.js           fflate 0.8.3 (MIT), solo gzip y zip sin Web Workers (lee los respaldos)

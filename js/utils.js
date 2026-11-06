@@ -195,9 +195,11 @@ export function newId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
 
-/** Un id solo puede tener letras, números, guion y guion bajo. */
+/** Un id solo puede tener letras, números, guion y guion bajo (y no nombres reservados de JavaScript). */
+const RESERVED_IDS = ['__proto__', 'constructor', 'prototype'];
+
 export function isValidId(id) {
-  return typeof id === 'string' && /^[\w-]{1,64}$/.test(id);
+  return typeof id === 'string' && /^[\w-]{1,64}$/.test(id) && !RESERVED_IDS.includes(id);
 }
 
 /* ---------- Ayudas para el DOM (siempre con textContent) ---------- */

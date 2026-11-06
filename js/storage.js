@@ -361,6 +361,89 @@ export function importBackup(text) {
 
 
 /* =========================================================
+   4b. RESTAURAR DESDE UN ARCHIVO (PDF o Excel descargado)
+   Se AGREGA lo que falta; lo que ya existe (mismo id) no se duplica.
+   Todo se valida igual que al leer o al agregar un dato.
+   ========================================================= */
+
+/**
+ * Revisa un respaldo SIN guardar nada.
+ * Devuelve { total, fresh } con cuántos registros trae de cada tipo y
+ * cuántos serían nuevos, o null si no tiene un formato válido.
+ */
+export function previewMerge(rawData) {
+  let clean;
+  try {
+    clean = sanitizeData(rawData).data;
+  } catch {
+    return null;
+  }
+
+  const current = db();
+  const total = {};
+  const fresh = {};
+  for (const name of Object.keys(SANITIZERS)) {
+    const ids = new Set(current[name].map((item) => item.id));
+    total[name] = clean[name].length;
+    fresh[name] = clean[name].filter((item) => !ids.has(item.id)).length;
+  }
+  return { total, fresh };
+}
+
+/**
+ * Agrega a la app lo que traiga el respaldo y todavía no exista.
+ * Devuelve { added, skipped } o null si no se pudo (y entonces no cambia nada).
+ */
+export function mergeBackup(rawData) {
+  let clean;
+  try {
+    clean = sanitizeData(rawData).data;
+  } catch {
+    return null;
+  }
+
+  const previous = structuredClone(db());
+  const current = db();
+  const added = { transactions: 0, loans: 0, debts: 0 };
+  let skipped = 0;
+
+  for (const name of Object.keys(SANITIZERS)) {
+    const ids = new Set(current[name].map((item) => item.id));
+    for (const item of clean[name]) {
+      if (ids.has(item.id)) {
+        skipped++;
+        continue;
+      }
+      current[name].push(item);
+      ids.add(item.id);
+      added[name]++;
+    }
+  }
+
+  if (!save()) {
+    data = previous; // se deshace todo si no cupo
+    return null;
+  }
+  return { added, skipped };
+}
+
+/**
+ * Borra TODOS los datos guardados (movimientos, deudas y préstamos).
+ * El tema (claro/oscuro) se conserva. Devuelve true si se pudo.
+ */
+export function clearAllData() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(CORRUPT_KEY);
+  } catch (error) {
+    console.error('No se pudieron borrar los datos:', error);
+    return false;
+  }
+  data = emptyData();
+  return true;
+}
+
+/* =========================================================
    5. TEMA (modo claro / oscuro)
    Se guarda aparte de los datos: no entra en los respaldos
    y no se borra si restauras uno.

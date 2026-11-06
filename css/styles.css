@@ -1088,6 +1088,34 @@ label.choice:has(input:focus-visible) {
 }
 
 /* =========================================================
+   BORRAR DATOS: botones de peligro (rojo)
+   ========================================================= */
+.btn-secondary--danger {
+  border-color: #b3261e;
+  color: #b3261e;
+}
+
+.btn-danger {
+  display: block;
+  width: 100%;
+  min-height: 2.9rem;
+  margin-bottom: 0.65rem;
+  padding: 0.7rem;
+  border: 1px solid #b3261e;
+  border-radius: 0.65rem;
+  background: #b3261e;
+  color: #ffffff;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-danger:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* =========================================================
    MODO OSCURO
    theme.js pone data-theme="dark" en <html>. Casi todo cambia solo
    porque los colores están en las variables; aquí se ajusta lo demás.
@@ -1108,6 +1136,11 @@ label.choice:has(input:focus-visible) {
 :root[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
 :root[data-theme="dark"] select {
   background: #121a2b;
+}
+
+:root[data-theme="dark"] .btn-secondary--danger {
+  border-color: #ff9a92;
+  color: #ff9a92;
 }
 
 :root[data-theme="dark"] .toast {
