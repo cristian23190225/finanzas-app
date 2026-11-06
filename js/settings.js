@@ -366,15 +366,17 @@ function buildDeleteCard() {
 
 export function renderSettings(container) {
   clear(container);
+
+  // Arriba de todo: volver a Inicio (en Ajustes no se ve la barra de pantallas)
+  const back = el('button', '← Volver a Inicio', 'btn-secondary');
+  back.type = 'button';
+  back.addEventListener('click', () => {
+    document.dispatchEvent(new CustomEvent('finanzas:ver', { detail: 'inicio' }));
+  });
+  container.appendChild(back);
+
   container.appendChild(buildThemeCard());
   container.appendChild(buildRestoreCard());
   container.appendChild(buildAppCard());
   container.appendChild(buildDeleteCard());
-
-  const back = el('button', '← Volver a Inicio', 'btn-secondary');
-  back.type = 'button';
-  back.addEventListener('click', () => {
-    document.querySelector('.nav__btn[data-view="inicio"]')?.click();
-  });
-  container.appendChild(back);
 }

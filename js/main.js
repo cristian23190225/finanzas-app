@@ -67,13 +67,19 @@ function animateIn(container, direction) {
   container.addEventListener('animationend', () => container.classList.remove(className), { once: true });
 }
 
-/** Muestra una pantalla y oculta las demás. */
-function showView(name) {
+/**
+ * Muestra una pantalla y oculta las demás.
+ * forcedDirection ('next' o 'prev') cambia hacia qué lado se desliza la animación.
+ */
+function showView(name, forcedDirection) {
   if (!VIEWS.includes(name)) return;
 
   const changed = name !== currentView;
-  const direction = VIEWS.indexOf(name) > VIEWS.indexOf(currentView) ? 'next' : 'prev';
+  const direction = forcedDirection ?? (VIEWS.indexOf(name) > VIEWS.indexOf(currentView) ? 'next' : 'prev');
   currentView = name;
+
+  // Le avisa al CSS en qué pantalla estamos (en Ajustes se esconde la barra de Inicio/Resumen/Préstamos/Deudas)
+  document.body.setAttribute('data-view', name);
 
   for (const viewName of VIEWS) {
     const container = document.getElementById(`view-${viewName}`);
@@ -114,6 +120,11 @@ function initNavigation() {
   // El engrane de la pantalla de Inicio abre Ajustes
   const settingsButton = document.getElementById('btn-settings');
   if (settingsButton) settingsButton.addEventListener('click', () => showView('ajustes'));
+
+  // Otros archivos (como settings.js) piden cambiar de pantalla con este aviso
+  document.addEventListener('finanzas:ver', (event) => {
+    if (typeof event.detail === 'string') showView(event.detail);
+  });
 }
 
 /* =========================================================
@@ -185,7 +196,11 @@ function initSwipe() {
 
       // Izquierda (dx < 0) = siguiente · Derecha = anterior. En los extremos no pasa nada.
       const index = SWIPE_VIEWS.indexOf(currentView);
-      if (index === -1) return; // en Ajustes no se desliza
+      if (index === -1) {
+        // En Ajustes: deslizar a la derecha regresa a Inicio (el resto no hace nada)
+        if (currentView === 'ajustes' && dx > 0) showView('inicio', 'prev');
+        return;
+      }
       const target = SWIPE_VIEWS[index + (dx < 0 ? 1 : -1)];
       if (target) showView(target);
     },
