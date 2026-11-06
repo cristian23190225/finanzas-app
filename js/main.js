@@ -8,8 +8,11 @@
 
 import { initCalendar, onDayChange } from './calendar.js';
 import { initDebts, renderDebts } from './debts.js';
+import { initExport } from './export.js';
 import { initLoans, renderLoans } from './loans.js';
 import { requestPersistence } from './storage.js';
+import { initTheme } from './theme.js';
+import { renderSettings } from './settings.js';
 import { renderSummary } from './summary.js';
 import { initTransactions } from './transactions.js';
 import { clear, el, todayISO } from './utils.js';
@@ -18,14 +21,17 @@ import { clear, el, todayISO } from './utils.js';
    1. NAVEGACIÓN
    ========================================================= */
 
-// El orden de esta lista es el orden al deslizar el dedo
-const VIEWS = ['inicio', 'resumen', 'prestamos', 'deudas'];
+// Las 4 pantallas de la barra de arriba. Su orden es el orden al deslizar el dedo.
+const SWIPE_VIEWS = ['inicio', 'resumen', 'prestamos', 'deudas'];
+// Todas las pantallas. "ajustes" no está en la barra: se abre con el engrane de Inicio.
+const VIEWS = [...SWIPE_VIEWS, 'ajustes'];
 
 // Cada pantalla que se llena con JavaScript registra aquí su función.
 const VIEW_RENDERERS = {
   resumen: renderSummary,
   prestamos: renderLoans,
   deudas: renderDebts,
+  ajustes: renderSettings,
 };
 
 // La pantalla que se está viendo
@@ -103,6 +109,10 @@ function initNavigation() {
   for (const button of document.querySelectorAll('.nav__btn')) {
     button.addEventListener('click', () => showView(button.dataset.view));
   }
+
+  // El engrane de la pantalla de Inicio abre Ajustes
+  const settingsButton = document.getElementById('btn-settings');
+  if (settingsButton) settingsButton.addEventListener('click', () => showView('ajustes'));
 }
 
 /* =========================================================
@@ -173,7 +183,9 @@ function initSwipe() {
       if (window.getSelection()?.toString()) return; // estabas seleccionando texto
 
       // Izquierda (dx < 0) = siguiente · Derecha = anterior. En los extremos no pasa nada.
-      const target = VIEWS[VIEWS.indexOf(currentView) + (dx < 0 ? 1 : -1)];
+      const index = SWIPE_VIEWS.indexOf(currentView);
+      if (index === -1) return; // en Ajustes no se desliza
+      const target = SWIPE_VIEWS[index + (dx < 0 ? 1 : -1)];
       if (target) showView(target);
     },
     { passive: true }
@@ -219,12 +231,14 @@ function fillTodayDates(today, previous = '') {
    ========================================================= */
 
 function init() {
+  initTheme();
   initNavigation();
   initSwipe();
   initCalendar();
   initTransactions();
   initDebts();
   initLoans();
+  initExport();
 
   fillTodayDates(todayISO());
   onDayChange(fillTodayDates);

@@ -865,3 +865,139 @@ label.choice:has(input:focus-visible) {
     animation: none;
   }
 }
+
+
+/* =========================================================
+   ENCABEZADO DE INICIO Y BOTÓN DE AJUSTES (el engrane)
+   ========================================================= */
+.home-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.home-header__title {
+  margin: 0;
+  min-width: 0;
+  font-size: 1.35rem;
+}
+
+.icon-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: var(--surface);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.icon-btn svg {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+
+.icon-btn:active {
+  background: var(--accent-soft);
+}
+
+/* En pantallas grandes (Inicio va en dos columnas) el encabezado ocupa todo el ancho */
+@media (min-width: 768px) {
+  #view-inicio .home-header {
+    grid-column: 1 / -1;
+    margin-bottom: 0;
+  }
+}
+
+/* =========================================================
+   ABONO A CAPITAL: grupo de campos y botones de atajo
+   ========================================================= */
+.dialog__group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dialog__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.dialog__row .btn-small {
+  flex: 1 1 auto;
+}
+
+.btn-small--outline {
+  background: var(--surface);
+  color: var(--accent);
+}
+
+/* =========================================================
+   MODO OSCURO
+   theme.js pone data-theme="dark" en <html>. Casi todo cambia solo
+   porque los colores están en las variables; aquí se ajusta lo demás.
+   ========================================================= */
+:root[data-theme="dark"] {
+  color-scheme: dark; /* calendarios, listas y barras de desplazamiento nativos */
+  --bg: #0f1420;
+  --surface: #1a2133;
+  --text: #e6ebf7;
+  --muted: #9aa5c3;
+  --border: #2a3350;
+  --accent: #5b86ff;
+  --accent-dark: #4a74ee;
+  --accent-soft: #223060;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+:root[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+:root[data-theme="dark"] select {
+  background: #121a2b;
+}
+
+:root[data-theme="dark"] .toast {
+  background: #2b3654;
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .toast--error {
+  background: #b3261e;
+}
+
+:root[data-theme="dark"] .dialog {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+}
+
+:root[data-theme="dark"] .dialog::backdrop {
+  background: rgba(0, 0, 0, 0.65);
+}
+
+:root[data-theme="dark"] .badge--late {
+  background: #3d1f23;
+  color: #ff9a92;
+}
+
+:root[data-theme="dark"] .badge--today {
+  background: #3d3213;
+  color: #ffd166;
+}
+
+:root[data-theme="dark"] .dialog__error,
+:root[data-theme="dark"] .move__sub--late,
+:root[data-theme="dark"] .sum-row--out strong,
+:root[data-theme="dark"] .move__amount--out {
+  color: #ff9a92;
+}
+
+:root[data-theme="dark"] .sum-row--in strong,
+:root[data-theme="dark"] .move__amount--in {
+  color: #5dd68c;
+}

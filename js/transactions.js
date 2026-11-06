@@ -87,6 +87,25 @@ export function getAvailableIncome(month = monthKey(todayISO())) {
   return roundMoney(total);
 }
 
+/**
+ * ¿Alcanza tu dinero disponible para restar esta cantidad de tus ingresos?
+ * Se usa antes de guardar un gasto, un ahorro, un préstamo o un pago de deuda
+ * que se reste de tus ingresos: no se puede sacar más de lo que hay.
+ */
+export function hasEnoughIncome(amount) {
+  return roundMoney(amount) <= getAvailableIncome();
+}
+
+/**
+ * Mensaje para cuando no alcanza.
+ * canUncheck = true agrega la pista de desmarcar "Restar de mis ingresos".
+ */
+export function notEnoughIncomeMessage(canUncheck = false) {
+  let message = `No tienes suficientes ingresos. Disponible: ${formatMoney(getAvailableIncome())}.`;
+  if (canUncheck) message += ' Agrega ingresos o desmarca "Restar de mis ingresos".';
+  return message;
+}
+
 /** Actualiza los totales que se ven en la pantalla de Inicio. */
 export function updateDisplays() {
   const saving = document.getElementById('saving-balance');
@@ -128,6 +147,12 @@ function handleSubmit(event, config) {
   // Casilla "Restar de mis ingresos" (solo en Ahorros).
   // Una casilla marcada llega como "on"; si no está marcada, no llega.
   const fromIncome = config.hasIncomeOption && formData.get('fromIncome') === 'on';
+
+  // No se puede gastar (ni restar de tus ingresos) más de lo que tienes disponible
+  if ((config.type === 'gasto' || fromIncome) && !hasEnoughIncome(amount)) {
+    showToast(notEnoughIncomeMessage(fromIncome), 'error');
+    return;
+  }
 
   // No se puede sacar más de lo que hay ahorrado
   if (config.type === 'retiro') {

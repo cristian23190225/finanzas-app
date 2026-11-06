@@ -13,7 +13,7 @@
    ========================================================= */
 
 import { addItem, getItems, removeItem, updateItem } from './storage.js';
-import { getAvailableIncome, updateDisplays } from './transactions.js';
+import { getAvailableIncome, hasEnoughIncome, notEnoughIncomeMessage, updateDisplays } from './transactions.js';
 import { showToast } from './ui.js';
 import {
   FREQUENCIES,
@@ -139,6 +139,10 @@ function handleSubmit(event) {
 
   // ¿Ese dinero sale de tus ingresos? (una casilla marcada llega como "on")
   const fromIncome = formData.get('fromIncome') === 'on';
+  if (fromIncome && !hasEnoughIncome(amount)) {
+    showToast(notEnoughIncomeMessage(true), 'error');
+    return;
+  }
 
   const hasInterest = formData.get('hasInterest') === 'on';
   let rate = 0;

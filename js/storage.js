@@ -358,3 +358,33 @@ export function importBackup(text) {
     return false;
   }
 }
+
+
+/* =========================================================
+   5. TEMA (modo claro / oscuro)
+   Se guarda aparte de los datos: no entra en los respaldos
+   y no se borra si restauras uno.
+   ========================================================= */
+
+const THEME_KEY = 'finanzas-app:theme';
+
+/** Devuelve 'light', 'dark' o null si todavía no se ha elegido. */
+export function getTheme() {
+  try {
+    const value = localStorage.getItem(THEME_KEY);
+    return value === 'light' || value === 'dark' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Guarda la elección. Devuelve true si se pudo guardar. */
+export function setTheme(theme) {
+  if (theme !== 'light' && theme !== 'dark') return false;
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+    return true;
+  } catch {
+    return false;
+  }
+}

@@ -16,7 +16,7 @@
    ========================================================= */
 
 import { addItem, getItems, removeItem, updateItem } from './storage.js';
-import { getAvailableIncome, updateDisplays } from './transactions.js';
+import { getAvailableIncome, hasEnoughIncome, notEnoughIncomeMessage, updateDisplays } from './transactions.js';
 import { showToast } from './ui.js';
 import {
   FREQUENCIES,
@@ -85,7 +85,7 @@ export function solvePeriodRate(cashPrice, total, payment) {
  * Simula los pagos que faltan: cuántos son y cuánto sumarán.
  * ok = false si el pago no alcanza ni para cubrir el interés (la deuda nunca acabaría).
  */
-function project(balance, payment, rate) {
+export function project(balance, payment, rate) {
   let left = balance;
   let count = 0;
   let total = 0;
@@ -103,6 +103,32 @@ function project(balance, payment, rate) {
     left = due - payment;
   }
   return { ok: count < 5000, count, total: roundMoney(total) };
+}
+
+/**
+ * Pago por periodo que hace falta para terminar de pagar "balance" en "n" pagos
+ * (o menos). Se redondea hacia arriba al centavo para que de verdad alcance.
+ * Devuelve null si no se puede calcular.
+ */
+export function paymentForCount(balance, rate, n) {
+  if (!(balance > 0) || !Number.isFinite(n) || n < 1) return null;
+  const periods = Math.floor(n);
+
+  // Fórmula de pago de un crédito (con tasa 0 es simplemente dividir entre los pagos)
+  let pay = rate > 0 ? (balance * rate) / (1 - Math.pow(1 + rate, -periods)) : balance / periods;
+  pay = Math.max(0.01, Math.ceil(pay * 100 - 1e-9) / 100);
+
+  // Nunca más de lo que se debe en el primer pago
+  const cap = roundMoney(balance * (1 + rate));
+  if (pay > cap) pay = cap;
+
+  // Seguridad: comprobamos que con ese pago se termine en "n" pagos o menos
+  for (let i = 0; i < 200; i++) {
+    const plan = project(balance, pay, rate);
+    if ((plan.ok && plan.count <= periods) || pay >= cap) break;
+    pay = Math.min(cap, roundMoney(pay + 0.01));
+  }
+  return pay;
 }
 
 /** Tasa por periodo de una deuda (las deudas viejas la calculan al vuelo). */
@@ -313,6 +339,9 @@ function openPaymentDialog(debt, container, defaultFromIncome) {
     const fromIncome = income.box.checked;
     const today = todayISO();
 
+    // No se puede restar de tus ingresos más de lo que tienes
+    if (fromIncome && !hasEnoughIncome(info.nextAmount)) return fail(notEnoughIncomeMessage(true));
+
     // 1) Se registra como movimiento (así el historial sobrevive aunque la deuda se elimine)
     const movement = addItem('transactions', {
       type: 'pago_deuda',
@@ -425,11 +454,33 @@ function openCapitalDialog(debt, container, defaultFromIncome) {
 
   const extraField = numberField('¿Cuánto abonas a capital?', 'extra');
   const payField = numberField('Pago por periodo después del abono', 'newPayment', String(debt.payment));
+  const countField = numberField('O en cuántos pagos quieres terminar', 'count');
+  countField.input.min = '1';
+  countField.input.step = '1';
+  countField.input.inputMode = 'numeric';
+
+  // Los pagos que te faltaban antes del abono (0 = el pago actual ni cubre los intereses)
+  const sameCount = info.paymentsLeft > 0 ? info.paymentsLeft : null;
+
+  // Atajos: el pago sugerido (mismos pagos de antes) o seguir con el pago actual
+  const suggestButton = el('button', '', 'btn-small');
+  suggestButton.type = 'button';
+  suggestButton.hidden = true;
+  const keepButton = el('button', `Seguir con ${formatMoney(debt.payment)}`, 'btn-small btn-small--outline');
+  keepButton.type = 'button';
+  const shortcuts = el('div', '', 'dialog__row');
+  shortcuts.append(suggestButton, keepButton);
+
   const tip = el(
     'p',
-    'Si dejas el mismo pago, terminas antes y ahorras más intereses. Si lo bajas, pagas menos cada vez pero tardas más.',
+    sameCount
+      ? `El pago sugerido es el que te deja terminar en los mismos ${pluralPayments(sameCount)} que te faltaban. Si no coincide con lo que te toca pagar, escribe tu propio pago o en cuántos pagos quieres terminar.`
+      : 'Escribe cuánto vas a pagar por periodo, o en cuántos pagos quieres terminar.',
     'card__total'
   );
+  const planBox = el('div', '', 'dialog__group');
+  planBox.append(payField.label, countField.label, shortcuts, tip);
+
   const preview = el('p', '', 'interest-preview');
   const income = incomeCheckbox(defaultFromIncome);
 
@@ -442,7 +493,43 @@ function openCapitalDialog(debt, container, defaultFromIncome) {
   cancelButton.type = 'button';
   cancelButton.addEventListener('click', () => dialog.close());
 
-  form.append(extraField.label, payField.label, tip, preview, income.label, errorBox, saveButton, cancelButton);
+  form.append(extraField.label, planBox, preview, income.label, errorBox, saveButton, cancelButton);
+
+  const MAX_COUNT = 1000; // tope de pagos que se pueden escribir
+  let touched = false; // true cuando tú escribiste tu propio pago o número de pagos
+
+  /** El abono escrito si es válido (si no, null). */
+  function readExtra() {
+    const extra = parseAmount(extraField.input.value);
+    return extra !== null && extra <= info.balance + EPS ? extra : null;
+  }
+
+  /** Capital que quedaría después del abono (null si todavía no hay un abono válido). */
+  function balanceAfter() {
+    const extra = readExtra();
+    return extra === null ? null : roundMoney(info.balance - extra);
+  }
+
+  function setPayment(value) {
+    payField.input.value = value === null ? '' : String(value);
+  }
+
+  /** Pone en "cuántos pagos" lo que resulta del pago escrito. */
+  function syncCount(newBalance) {
+    const pay = parseAmount(payField.input.value);
+    const plan = pay === null ? null : project(newBalance, pay, info.rate);
+    countField.input.value = plan && plan.ok ? String(plan.count) : '';
+  }
+
+  /** Cambió el abono: se vuelve a calcular el pago sugerido (si no escribiste el tuyo). */
+  function onExtraChange() {
+    const newBalance = balanceAfter();
+    if (newBalance !== null && newBalance >= EPS) {
+      if (!touched && sameCount) setPayment(paymentForCount(newBalance, info.rate, sameCount));
+      syncCount(newBalance);
+    }
+    updatePreview();
+  }
 
   // Vista previa: cuánto quedaría, cuántos pagos y cuánto se ahorra
   function updatePreview() {
@@ -450,25 +537,29 @@ function openCapitalDialog(debt, container, defaultFromIncome) {
     const extra = parseAmount(extraField.input.value);
     if (extra === null) {
       preview.textContent = 'Escribe cuánto abonas para ver cuánto te ahorras.';
-      payField.label.hidden = false;
-      tip.hidden = false;
+      planBox.hidden = false;
+      suggestButton.hidden = true;
       return;
     }
     if (extra > info.balance + EPS) {
       preview.textContent = `No puedes abonar más del capital que debes (${formatMoney(info.balance)}).`;
-      payField.label.hidden = false;
-      tip.hidden = false;
+      planBox.hidden = false;
+      suggestButton.hidden = true;
       return;
     }
     const newBalance = roundMoney(info.balance - extra);
     if (newBalance < EPS) {
       preview.textContent = 'Con este abono liquidas la deuda.';
-      payField.label.hidden = true; // ya no hay pagos futuros
-      tip.hidden = true;
+      planBox.hidden = true; // ya no hay pagos futuros
       return;
     }
-    payField.label.hidden = false;
-    tip.hidden = false;
+    planBox.hidden = false;
+
+    const suggested = sameCount ? paymentForCount(newBalance, info.rate, sameCount) : null;
+    suggestButton.hidden = suggested === null;
+    if (suggested !== null) {
+      suggestButton.textContent = `Pagar ${formatMoney(suggested)} (mismos ${pluralPayments(sameCount)})`;
+    }
 
     const newPay = parseAmount(payField.input.value);
     if (newPay === null) {
@@ -481,12 +572,46 @@ function openCapitalDialog(debt, container, defaultFromIncome) {
       return;
     }
     const saving = roundMoney(info.remaining - (extra + plan.total));
-    let text = `Te quedarían ${formatMoney(newBalance)} de capital: ${pluralPayments(plan.count)} más (${formatMoney(plan.total)} en total).`;
+    let text = `Te quedarían ${formatMoney(newBalance)} de capital. De ahora en adelante: ${pluralPayments(plan.count)} de ${formatMoney(newPay)} (${formatMoney(plan.total)} en total).`;
     if (saving > 0.005) text += ` Ahorras ${formatMoney(saving)} en intereses.`;
     preview.textContent = text;
   }
-  extraField.input.addEventListener('input', updatePreview);
-  payField.input.addEventListener('input', updatePreview);
+
+  extraField.input.addEventListener('input', onExtraChange);
+
+  // Escribiste tu propio pago: se calcula en cuántos pagos terminas
+  payField.input.addEventListener('input', () => {
+    touched = true;
+    const newBalance = balanceAfter();
+    if (newBalance !== null && newBalance >= EPS) syncCount(newBalance);
+    updatePreview();
+  });
+
+  // Escribiste en cuántos pagos quieres terminar: se calcula el pago
+  countField.input.addEventListener('input', () => {
+    touched = true;
+    const newBalance = balanceAfter();
+    const n = Math.floor(Number(countField.input.value));
+    if (newBalance !== null && newBalance >= EPS && Number.isFinite(n) && n >= 1) {
+      const pay = paymentForCount(newBalance, info.rate, Math.min(n, MAX_COUNT));
+      if (pay !== null) setPayment(pay);
+    }
+    updatePreview();
+  });
+
+  suggestButton.addEventListener('click', () => {
+    touched = false;
+    onExtraChange();
+  });
+
+  keepButton.addEventListener('click', () => {
+    touched = true;
+    setPayment(debt.payment);
+    const newBalance = balanceAfter();
+    if (newBalance !== null && newBalance >= EPS) syncCount(newBalance);
+    updatePreview();
+  });
+
   updatePreview();
 
   const fail = (message) => {
@@ -520,6 +645,9 @@ function openCapitalDialog(debt, container, defaultFromIncome) {
 
     const fromIncome = income.box.checked;
     const today = todayISO();
+
+    // No se puede restar de tus ingresos más de lo que tienes
+    if (fromIncome && !hasEnoughIncome(extra)) return fail(notEnoughIncomeMessage(true));
 
     // 1) Movimiento en el historial
     const movement = addItem('transactions', {
@@ -654,6 +782,8 @@ function openSettleDialog(debt, container, defaultFromIncome) {
     }
 
     const fromIncome = income.box.checked;
+    if (fromIncome && !hasEnoughIncome(amount)) return fail(notEnoughIncomeMessage(true));
+
     const ok = window.confirm(
       `¿Liquidar "${debt.concept}" con ${formatMoney(amount)}?\n` +
         `${fromIncome ? 'Se restará de tus ingresos.' : 'No se restará de tus ingresos.'}\n` +
