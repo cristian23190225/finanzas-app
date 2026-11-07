@@ -29,6 +29,9 @@ function ensureToast() {
  */
 export function showToast(message, kind = 'ok') {
   const toast = ensureToast();
+  // Si hay una hoja o ventana abierta, el aviso va DENTRO de ella (si no, quedaría tapado por detrás)
+  const host = document.querySelector('dialog[open]') || document.body;
+  if (toast.parentNode !== host) host.appendChild(toast);
   toast.textContent = message; // textContent: nunca se interpreta como HTML
   toast.classList.toggle('toast--error', kind === 'error');
   toast.classList.add('is-visible');

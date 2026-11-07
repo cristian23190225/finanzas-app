@@ -9,7 +9,7 @@
     if (theme !== 'dark' && theme !== 'light') return;
     document.documentElement.setAttribute('data-theme', theme);
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', theme === 'dark' ? '#0f1420' : '#f5f7fb');
+    if (meta) meta.setAttribute('content', theme === 'dark' ? '#0a1020' : '#14213d');
   } catch (e) {
     /* si el navegador bloquea el almacenamiento, se queda en claro */
   }

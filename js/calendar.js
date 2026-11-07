@@ -28,6 +28,7 @@ const TICK_MS = 10 * 1000; // cada cuánto se revisa si cambió el día
 const COUNTDOWN_MS = 1000; // el contador del aviso se mueve cada segundo
 
 const monthFormatter = new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' });
+const chipFormatter = new Intl.DateTimeFormat('es-MX', { weekday: 'short', day: 'numeric', month: 'short' });
 
 let shownDay = null; // el "hoy" real que el calendario conoce
 let selectedDay = null; // día pasado elegido ("AAAA-MM-DD"), o null = se usa hoy
@@ -165,6 +166,20 @@ function renderCalendar() {
   // Fecha completa debajo: "martes, 3 de noviembre de 2026"
   const active = activeDate();
   label.textContent = selectedDay ? `Día seleccionado: ${formatLongDate(active)}` : formatLongDate(active);
+
+  // Botón del panel de Inicio: "Hoy · jue 6 nov" o, en un día pasado, "Registrando: mié 4 nov"
+  const chip = document.getElementById('date-chip');
+  const chipText = document.getElementById('date-chip-text');
+  const activeDate_ = parseISODate(active);
+  if (chipText && activeDate_) {
+    chipText.textContent = `${selectedDay ? 'Registrando' : 'Hoy'} · ${chipFormatter.format(activeDate_)}`;
+  }
+  if (chip) chip.classList.toggle('is-past', selectedDay !== null);
+}
+
+/** Avisa que ya se eligió un día (la hoja del calendario se cierra sola). */
+function announceDayChosen() {
+  document.dispatchEvent(new CustomEvent('finanzas:dia-elegido'));
 }
 
 /** "4:32" a partir de milisegundos. */
@@ -241,6 +256,7 @@ function onDayClick(iso) {
   // Tocar otra vez el día elegido reinicia los 5 minutos
   returnAt = Date.now() + RETURN_AFTER_MS;
   updateBanner();
+  announceDayChosen();
   showToast('Reiniciaste el contador: tienes 5 minutos más en este día.');
 }
 
@@ -282,6 +298,7 @@ function setSelectedDay(iso, reason = '') {
   if (now !== previous) {
     for (const listener of activeDateListeners) listener(now, previous);
   }
+  if (iso !== null || reason === 'manual') announceDayChosen();
 }
 
 /* =========================================================

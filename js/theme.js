@@ -9,7 +9,7 @@
 import { getTheme, setTheme } from './storage.js';
 import { el } from './utils.js';
 
-const BAR_COLORS = { light: '#f5f7fb', dark: '#0f1420' }; // color de la barra del teléfono
+const BAR_COLORS = { light: '#14213d', dark: '#0a1020' }; // color de la barra del teléfono
 
 /** Pone el tema en pantalla (no lo guarda). */
 function applyTheme(theme) {

@@ -3,16 +3,38 @@
    Si quieres cambiar el look, cambias solo estas líneas.
    ========================================================= */
 :root {
-  --bg: #f5f7fb;
-  --surface: #ffffff;
-  --text: #1f2a44;
-  --muted: #6b7694;
-  --border: #e3e8f2;
-  --accent: #4f7cff;
-  --accent-dark: #3b66e6;
-  --accent-soft: #eaf0ff;
-  --radius: 0.9rem;
-  --shadow: 0 2px 8px rgba(31, 42, 68, 0.06);
+  /* Superficies: gris azulado suave (nada de blanco puro que canse la vista) */
+  --bg: #e2e7ef;
+  --surface: #f1f4f9;
+  --text: #1b2333;
+  --muted: #55627a;
+  --border: #c9d2e0;
+  --accent: #2f5bd8;
+  --accent-dark: #2449b8;
+  --accent-soft: #dce5fb;
+  --radius: 1rem;
+  --shadow: 0 1px 2px rgba(20, 33, 61, 0.08), 0 4px 14px rgba(20, 33, 61, 0.07);
+
+  /* Campos de texto */
+  --input-bg: #fafbfd;
+  --input-border: #7c8aa6;
+
+  /* Barra de arriba y panel de saldo (marino: contraste fuerte con el fondo) */
+  --nav-bg: #14213d;
+  --panel-bg: #14213d;
+  --panel-2: #1f3366;
+  --panel-text: #f3f6fc;
+  --panel-muted: #aebbd6;
+
+  /* Colores con significado (todos con contraste suficiente) */
+  --success: #17803d;
+  --success-soft: #ddf1e4;
+  --danger: #b3261e;
+  --danger-soft: #f7ddda;
+  --warn: #8a5300;
+  --warn-soft: #f6e8cf;
+  --teal: #0f6e74;
+  --teal-soft: #d5ebec;
 }
 
 /* =========================================================
@@ -48,7 +70,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   line-height: 1.4;
   /* Respeta la muesca y las barras del iPhone (también en horizontal) */
-  padding-top: env(safe-area-inset-top);
+  padding-top: 0; /* la zona de la muesca la cubre la barra de arriba (.topbar) */
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
@@ -222,9 +244,9 @@ select {
   max-width: 100%;
   min-height: 2.75rem;
   padding: 0.6rem 0.8rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--input-border);
   border-radius: 0.65rem;
-  background: #ffffff;
+  background: var(--input-bg);
   color: var(--text);
   /* Nunca menos de 16px: así el iPhone no hace zoom solo al tocar un cuadro */
   font-size: max(16px, 1rem);
@@ -965,8 +987,8 @@ label.choice:has(input:focus-visible) {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
+  padding-top: env(safe-area-inset-top); /* la muesca queda del mismo color que la barra */
+  background: var(--nav-bg);
 }
 
 .topbar .nav {
@@ -1131,21 +1153,466 @@ body[data-view="ajustes"] .topbar {
 }
 
 /* =========================================================
+   DISEÑO NUEVO: barra marino, panel de saldo, botones, hojas y carga
+   ========================================================= */
+
+/* Anillo de enfoque visible (teclado y lectores de pantalla) */
+:where(button, input, select, a, summary):focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---- Barra de arriba (marino) ---- */
+.nav {
+  position: static;
+  background: transparent;
+  border-bottom: 0;
+}
+
+.nav__btn {
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.09);
+  color: #c9d4ec;
+}
+
+.nav__btn.is-active {
+  border-color: transparent;
+  background: #f3f6fc;
+  color: #14213d;
+}
+
+.nav__btn:focus-visible {
+  outline-color: #ffffff;
+}
+
+/* ---- Encabezado de Inicio ---- */
+.home-header__title {
+  font-size: 1.45rem;
+  letter-spacing: -0.02em;
+}
+
+.section-label {
+  margin: 1.4rem 0 0.6rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ---- Panel de saldo ---- */
+.balance {
+  padding: 1.1rem 1.1rem 1rem;
+  border-radius: 1.25rem;
+  background: linear-gradient(155deg, var(--panel-2) 0%, var(--panel-bg) 75%);
+  color: var(--panel-text);
+  box-shadow: var(--shadow);
+}
+
+.balance__label {
+  margin: 0;
+  color: var(--panel-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.balance__amount {
+  margin: 0.15rem 0 0.8rem;
+  font-size: clamp(2.1rem, 10vw, 2.8rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums; /* los números no "bailan" al animarse */
+}
+
+.balance__amount.is-negative {
+  color: #ff9a92;
+}
+
+.balance__meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin: 0 0 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.balance__meta dt {
+  color: var(--panel-muted);
+  font-size: 0.78rem;
+}
+
+.balance__meta dd {
+  margin: 0.1rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Botón con el día de registro (abre el calendario) */
+.date-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.6rem;
+  max-width: 100%;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  color: inherit;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.date-chip svg {
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.date-chip:focus-visible {
+  outline-color: #ffffff;
+}
+
+/* Si registras en un día pasado, el botón se resalta en ámbar */
+.date-chip.is-past {
+  border-color: transparent;
+  background: #f2be63;
+  color: #2b1e00;
+}
+
+/* ---- Botones de acción (Ingreso, Gasto...) ---- */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.85rem 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+
+.tile:active {
+  transform: scale(0.96);
+  background: var(--accent-soft);
+}
+
+.tile__icon {
+  display: grid;
+  place-items: center;
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tile__icon svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.tile--in .tile__icon {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.tile--out .tile__icon {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.tile--debt .tile__icon {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.tile--loan .tile__icon {
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.actions-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.actions-row .btn-secondary {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+/* ---- Hojas inferiores (formularios y calendario) ---- */
+.sheet {
+  position: fixed;
+  inset: auto 0 0 0;
+  width: 100%;
+  max-width: 34rem;
+  max-height: 92vh;
+  max-height: 92dvh;
+  margin: 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 1.4rem 1.4rem 0 0;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 -10px 40px rgba(10, 16, 32, 0.35);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sheet::backdrop {
+  background: rgba(10, 16, 32, 0.6);
+}
+
+.sheet[open] {
+  animation: sheet-up 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sheet[open]::backdrop {
+  animation: sheet-fade 0.26s ease both;
+}
+
+.sheet.is-closing {
+  animation: sheet-down 0.2s ease-in forwards;
+}
+
+.sheet__inner {
+  padding: 0 1rem calc(1.25rem + env(safe-area-inset-bottom));
+}
+
+.sheet__head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1.15rem 0 0.5rem;
+  background: var(--surface);
+}
+
+/* Rayita de arriba: avisa que la hoja se puede cerrar */
+.sheet__head::before {
+  content: "";
+  position: absolute;
+  top: 0.4rem;
+  left: 50%;
+  width: 2.5rem;
+  height: 0.25rem;
+  border-radius: 999px;
+  background: var(--input-border);
+  opacity: 0.5;
+  transform: translateX(-50%);
+}
+
+.sheet__title {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+}
+
+.sheet__hint {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+/* El calendario dentro de la hoja no necesita su propio recuadro */
+.sheet .calendar {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Los avisos que salen mientras hay una hoja abierta van ARRIBA (abajo taparían el botón o el teclado) */
+dialog .toast {
+  top: calc(0.75rem + env(safe-area-inset-top));
+  bottom: auto;
+  transform: translate(-50%, -1rem);
+}
+
+dialog .toast.is-visible {
+  transform: translate(-50%, 0);
+}
+
+#view-inicio .sheet .calendar {
+  width: 100%;
+}
+
+body:has(dialog[open]) {
+  overflow: hidden; /* mientras hay una hoja abierta, la página de atrás no se mueve */
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+
+@keyframes sheet-down {
+  to { transform: translateY(100%); }
+}
+
+@keyframes sheet-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ---- Pantalla de carga ---- */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: var(--nav-bg);
+  color: #f3f6fc;
+  transition: opacity 0.35s ease, visibility 0.35s;
+  /* Seguro: si el JavaScript fallara, a los 5 segundos se oculta sola */
+  animation: splash-failsafe 0.4s ease 5s forwards;
+}
+
+.splash.is-hiding {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.splash__logo {
+  width: 6rem;
+  height: 6rem;
+  border-radius: 1.5rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  animation: splash-pop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+.splash__name {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.splash__bar {
+  width: 9rem;
+  height: 0.25rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.splash__bar::after {
+  content: "";
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: 999px;
+  background: #8fb0ff;
+  animation: splash-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes splash-pop {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes splash-slide {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(280%); }
+}
+
+@keyframes splash-failsafe {
+  to { opacity: 0; visibility: hidden; }
+}
+
+/* Con "reducir movimiento" no se anima nada de esto */
+@media (prefers-reduced-motion: reduce) {
+  .sheet[open],
+  .sheet[open]::backdrop,
+  .sheet.is-closing,
+  .splash__logo,
+  .splash__bar::after {
+    animation: none;
+  }
+
+  .splash__bar::after {
+    width: 100%;
+  }
+
+  .tile {
+    transition: none;
+  }
+}
+
+/* Tabletas y pantallas grandes: Inicio en una sola columna centrada */
+@media (min-width: 768px) {
+  #view-inicio {
+    display: block;
+    max-width: 40rem;
+  }
+}
+
+/* =========================================================
    MODO OSCURO
    theme.js pone data-theme="dark" en <html>. Casi todo cambia solo
    porque los colores están en las variables; aquí se ajusta lo demás.
    ========================================================= */
 :root[data-theme="dark"] {
   color-scheme: dark; /* calendarios, listas y barras de desplazamiento nativos */
-  --bg: #0f1420;
-  --surface: #1a2133;
-  --text: #e6ebf7;
-  --muted: #9aa5c3;
+  --bg: #0e1424;
+  --surface: #1a2236;
+  --text: #e8ecf6;
+  --muted: #9aa6c0;
   --border: #2a3350;
-  --accent: #5b86ff;
-  --accent-dark: #4a74ee;
+  --accent: #6b93ff;
+  --accent-dark: #5578e0;
   --accent-soft: #223060;
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 4px 14px rgba(0, 0, 0, 0.35);
+
+  --input-bg: #121a2b;
+  --input-border: #657699;
+  --nav-bg: #0a1020;
+  --panel-bg: #1b2b58;
+  --panel-2: #263c78;
+  --panel-text: #f3f6fc;
+  --panel-muted: #b4c0dc;
+
+  --success: #4fd18b;
+  --success-soft: #1c3b2e;
+  --danger: #ff8a80;
+  --danger-soft: #44232a;
+  --warn: #f2be63;
+  --warn-soft: #433718;
+  --teal: #4fd1d8;
+  --teal-soft: #1b3c44;
 }
 
 :root[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),

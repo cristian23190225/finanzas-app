@@ -8,6 +8,7 @@
 
 import { activeDate, initCalendar, onActiveDateChange, onDayChange } from './calendar.js';
 import { initDebts, renderDebts } from './debts.js';
+import { hideSplash, initHome } from './home.js';
 import { initExport } from './export.js';
 import { initLoans, renderLoans } from './loans.js';
 import { initPwa } from './pwa.js';
@@ -255,6 +256,7 @@ function init() {
   initDebts();
   initLoans();
   initExport();
+  initHome();
 
   fillTodayDates(activeDate());
   // Si cambia el día real (medianoche) o eliges otro día en el calendario,
@@ -267,6 +269,9 @@ function init() {
 
   // Modo sin internet y avisos de versión nueva (si falla, la app sigue funcionando normal)
   initPwa().catch((error) => console.error('Error al iniciar el modo sin internet:', error));
+
+  // La app ya está lista: se quita la pantalla de carga
+  hideSplash();
 }
 
 init();
