@@ -1581,6 +1581,201 @@ body:has(dialog[open]) {
 }
 
 /* =========================================================
+   RESUMEN: mismo lenguaje que Inicio (panel marino, tarjetas, íconos)
+   ========================================================= */
+
+/* Selector de mes en forma de píldora */
+.month-nav {
+  padding: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.month-nav .btn-small.btn-small--outline {
+  flex: none;
+  width: 2.6rem;
+  min-width: 2.6rem;
+  height: 2.6rem;
+  min-height: 2.6rem;
+  padding: 0;
+  border-color: transparent;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.month-nav .btn-small.btn-small--outline:disabled {
+  opacity: 0.35;
+}
+
+.month-nav__label {
+  letter-spacing: -0.01em;
+}
+
+/* Panel de saldo del Resumen: tres datos en fila */
+.balance__meta--3 {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.balance__meta--3 dd {
+  font-size: 0.95rem;
+}
+
+.balance__meta .is-in {
+  color: #8ae6ae;
+}
+
+.balance__meta .is-out {
+  color: #ff9a92;
+}
+
+#view-resumen .balance {
+  margin-bottom: 0;
+}
+
+/* Debo / Me deben */
+.kpi-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin: 0.8rem 0 1rem;
+}
+
+.kpi {
+  min-width: 0;
+  padding: 0.9rem 0.9rem 0.8rem;
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--kpi-color, var(--accent));
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.kpi--debt {
+  --kpi-color: var(--warn);
+}
+
+.kpi--loan {
+  --kpi-color: var(--teal);
+}
+
+.kpi__label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.kpi__amount {
+  margin: 0.2rem 0 0.25rem;
+  font-size: clamp(1.15rem, 5.4vw, 1.55rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi__sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.kpi__sub--alert {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+/* Encabezados de las tarjetas del Resumen: etiqueta pequeña, como en Inicio */
+#view-resumen .card h2 {
+  margin-bottom: 0.7rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Colores con significado (antes eran fijos) */
+.sum-row--in strong,
+.move__amount--in {
+  color: var(--success);
+}
+
+.sum-row--out strong,
+.move__amount--out,
+.move__sub--late {
+  color: var(--danger);
+}
+
+.badge--late {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.badge--today {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+/* Listas con ícono de color */
+.move {
+  align-items: center;
+}
+
+.move__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.move__icon svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.move__icon--in {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.move__icon--out {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.move__icon--debt {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.move__icon--loan {
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.move__main {
+  flex: 1;
+}
+
+/* Pantallas grandes: el panel y las tarjetas de arriba ocupan todo el ancho */
+@media (min-width: 768px) {
+  #view-resumen .kpi-row {
+    margin: 0;
+  }
+}
+
+/* =========================================================
    MODO OSCURO
    theme.js pone data-theme="dark" en <html>. Casi todo cambia solo
    porque los colores están en las variables; aquí se ajusta lo demás.

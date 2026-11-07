@@ -2,10 +2,10 @@
    summary.js
    Pantalla "Resumen": todo tu dinero de un vistazo.
      1. Selector de mes (‹ ›).
-     2. Ingresos y gastos del mes y lo disponible al cierre.
-     3. Ahorros.
-     4. Deudas y préstamos (situación de hoy).
-     5. Lo que viene (próximos pagos y cobros).
+     2. Panel de saldo: disponible, mes anterior, entradas y salidas.
+     3. Lo que debo / lo que me deben (situación de hoy).
+     4. Lo que viene (próximos pagos y cobros).
+     5. Detalle: ingresos y gastos, ahorros, deudas y préstamos.
      6. Movimientos del mes.
    Solo lee los datos: no guarda ni cambia nada.
    ========================================================= */
@@ -45,6 +45,50 @@ const TYPE_LABELS = {
 
 // El mes que se está viendo, con formato "AAAA-MM"
 let shownMonth = '';
+
+/* Íconos (Feather, MIT): cada uno es una lista de [forma, atributos] */
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const ICONS = {
+  in: [['polyline', { points: '7 10 12 15 17 10' }], ['line', { x1: 12, y1: 15, x2: 12, y2: 3 }], ['path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }]],
+  out: [['polyline', { points: '17 8 12 3 7 8' }], ['line', { x1: 12, y1: 3, x2: 12, y2: 15 }], ['path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }]],
+  save: [['polyline', { points: '21 8 21 21 3 21 3 8' }], ['rect', { x: 1, y: 3, width: 22, height: 5 }], ['line', { x1: 10, y1: 12, x2: 14, y2: 12 }]],
+  back: [['path', { d: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4' }], ['polyline', { points: '16 17 21 12 16 7' }], ['line', { x1: 21, y1: 12, x2: 9, y2: 12 }]],
+  debt: [['rect', { x: 1, y: 4, width: 22, height: 16, rx: 2, ry: 2 }], ['line', { x1: 1, y1: 10, x2: 23, y2: 10 }]],
+  loan: [['line', { x1: 22, y1: 2, x2: 11, y2: 13 }], ['polygon', { points: '22 2 15 22 11 13 2 9 22 2' }]],
+};
+
+// Qué ícono y color lleva cada tipo de movimiento
+const TYPE_VISUALS = {
+  ingreso: { icon: 'in', tone: 'in' },
+  gasto: { icon: 'out', tone: 'out' },
+  ahorro: { icon: 'save', tone: 'save' },
+  retiro: { icon: 'back', tone: 'save' },
+  pago_deuda: { icon: 'debt', tone: 'debt' },
+  prestamo: { icon: 'loan', tone: 'loan' },
+  cobro_interes: { icon: 'in', tone: 'loan' },
+  cobro_prestamo: { icon: 'in', tone: 'loan' },
+};
+
+/** Círculo de color con un ícono adentro (decorativo: el texto ya dice lo mismo). */
+function iconBadge(iconName, tone) {
+  const badge = el('span', '', `move__icon move__icon--${tone}`);
+  badge.setAttribute('aria-hidden', 'true');
+
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  for (const [shape, attributes] of ICONS[iconName] ?? []) {
+    const node = document.createElementNS(SVG_NS, shape);
+    for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, String(value));
+    svg.appendChild(node);
+  }
+  badge.appendChild(svg);
+  return badge;
+}
 
 /* =========================================================
    1. AYUDAS DE FECHAS Y TEXTO
@@ -198,7 +242,7 @@ function upcomingItems(today) {
   for (const debt of getItems('debts')) {
     const info = describeDebt(debt, today);
     if (info.balance > 0) {
-      items.push({ date: info.nextDue, title: `Pagar · ${debt.concept}`, amount: info.nextAmount, kind: 'out' });
+      items.push({ date: info.nextDue, title: `Pagar · ${debt.concept}`, amount: info.nextAmount, kind: 'out', icon: 'debt', tone: 'debt' });
     }
   }
 
@@ -206,12 +250,32 @@ function upcomingItems(today) {
     if (!loan.hasInterest) continue;
     const info = describeLoan(loan, today);
     if (info.outstanding > 0) {
-      items.push({ date: info.nextDue, title: `Cobrar interés · ${loan.person}`, amount: info.interestNext, kind: 'in' });
+      items.push({ date: info.nextDue, title: `Cobrar interés · ${loan.person}`, amount: info.interestNext, kind: 'in', icon: 'loan', tone: 'loan' });
     }
   }
 
   items.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   return items;
+}
+
+/** Resumen de tus deudas hoy. */
+function debtStats(today) {
+  const debts = getItems('debts').map((debt) => describeDebt(debt, today));
+  return {
+    count: debts.length,
+    totalLeft: roundMoney(debts.reduce((sum, info) => sum + info.remaining, 0)),
+    overdue: debts.filter((info) => daysBetween(today, info.nextDue) < 0).length,
+  };
+}
+
+/** Resumen de tus préstamos hoy. */
+function loanStats(today) {
+  const loans = getItems('loans').map((loan) => describeLoan(loan, today));
+  return {
+    count: loans.length,
+    totalOwed: roundMoney(loans.reduce((sum, info) => sum + info.outstanding, 0)),
+    overdueInterest: roundMoney(loans.reduce((sum, info) => sum + info.pending * info.interestNext, 0)),
+  };
 }
 
 /* =========================================================
@@ -244,6 +308,72 @@ function buildMonthNav(container, month, earliest, current) {
 
   nav.append(prev, label, next);
   return nav;
+}
+
+/** Panel marino: disponible del mes y de dónde salió (igual que en Inicio). */
+function buildHero(month, isCurrent, totals) {
+  const hero = el('section', '', 'balance span-all');
+  hero.setAttribute('aria-label', 'Saldo del mes');
+
+  hero.appendChild(el('p', isCurrent ? 'Disponible ahora' : 'Disponible al cierre', 'balance__label'));
+  const available = getAvailableIncome(month);
+  hero.appendChild(el('p', formatMoney(available), `balance__amount${available < 0 ? ' is-negative' : ''}`));
+
+  const entries = roundMoney(totals.ingresos + totals.retiros + totals.cobros);
+  const exits = roundMoney(totals.gastos + totals.ahorros + totals.pagosDeuda + totals.prestamos);
+
+  const meta = el('dl', '', 'balance__meta balance__meta--3');
+  for (const [label, value, tone] of [
+    ['Mes anterior', formatMoney(getCarryOver(month)), ''],
+    ['Entradas', `+ ${formatMoney(entries)}`, 'is-in'],
+    ['Salidas', `− ${formatMoney(exits)}`, 'is-out'],
+  ]) {
+    const box = el('div');
+    box.append(el('dt', label), el('dd', value, tone));
+    meta.appendChild(box);
+  }
+  hero.appendChild(meta);
+  return hero;
+}
+
+/** Dos tarjetas de un vistazo: lo que debo y lo que me deben. */
+function buildKpis(today) {
+  const row = el('div', '', 'kpi-row span-all');
+
+  const debts = debtStats(today);
+  const debtCard = el('section', '', 'kpi kpi--debt');
+  debtCard.append(
+    el('p', 'Debo', 'kpi__label'),
+    el('p', formatMoney(debts.totalLeft), 'kpi__amount'),
+    el(
+      'p',
+      debts.count === 0
+        ? 'Sin deudas'
+        : debts.overdue > 0
+          ? `${debts.overdue} con pago vencido`
+          : `${debts.count} ${plural(debts.count, 'deuda', 'deudas')} al corriente`,
+      `kpi__sub${debts.overdue > 0 ? ' kpi__sub--alert' : ''}`
+    )
+  );
+
+  const loans = loanStats(today);
+  const loanCard = el('section', '', 'kpi kpi--loan');
+  loanCard.append(
+    el('p', 'Me deben', 'kpi__label'),
+    el('p', formatMoney(loans.totalOwed), 'kpi__amount'),
+    el(
+      'p',
+      loans.count === 0
+        ? 'Sin préstamos'
+        : loans.overdueInterest > 0
+          ? `${formatMoney(loans.overdueInterest)} de interés vencido`
+          : `${loans.count} ${plural(loans.count, 'préstamo', 'préstamos')} al corriente`,
+      `kpi__sub${loans.overdueInterest > 0 ? ' kpi__sub--alert' : ''}`
+    )
+  );
+
+  row.append(debtCard, loanCard);
+  return row;
 }
 
 function buildIncomeCard(month, isCurrent, totals) {
@@ -291,8 +421,8 @@ function buildDebtsCard(today, totals) {
   const card = el('section', '', 'card');
   card.appendChild(el('h2', 'Mis deudas'));
 
-  const debts = getItems('debts').map((debt) => describeDebt(debt, today));
-  if (debts.length === 0) {
+  const stats = debtStats(today);
+  if (stats.count === 0) {
     card.appendChild(el('p', 'No tienes deudas registradas.', 'card__total'));
     if (totals.debtPaidTotal > 0) {
       const list = el('div', '', 'sum-list');
@@ -302,14 +432,11 @@ function buildDebtsCard(today, totals) {
     return card;
   }
 
-  const totalLeft = roundMoney(debts.reduce((sum, info) => sum + info.remaining, 0));
-  const overdue = debts.filter((info) => daysBetween(today, info.nextDue) < 0).length;
-
   const list = el('div', '', 'sum-list');
-  list.appendChild(sumRow(`Debo en total (${debts.length} ${plural(debts.length, 'deuda', 'deudas')})`, formatMoney(totalLeft), 'total'));
+  list.appendChild(sumRow(`Debo en total (${stats.count} ${plural(stats.count, 'deuda', 'deudas')})`, formatMoney(stats.totalLeft)));
   list.appendChild(sumRow('Pagado en el mes', formatMoney(totals.debtPaidTotal)));
-  if (overdue > 0) {
-    list.appendChild(sumRow('Con pago vencido', `${overdue} ${plural(overdue, 'deuda', 'deudas')}`, 'out'));
+  if (stats.overdue > 0) {
+    list.appendChild(sumRow('Con pago vencido', `${stats.overdue} ${plural(stats.overdue, 'deuda', 'deudas')}`, 'out'));
   }
   card.appendChild(list);
   return card;
@@ -319,8 +446,8 @@ function buildLoansCard(today, totals) {
   const card = el('section', '', 'card');
   card.appendChild(el('h2', 'Mis préstamos'));
 
-  const loans = getItems('loans').map((loan) => describeLoan(loan, today));
-  if (loans.length === 0) {
+  const stats = loanStats(today);
+  if (stats.count === 0) {
     card.appendChild(el('p', 'No tienes préstamos registrados.', 'card__total'));
     if (totals.collectedTotal > 0) {
       const list = el('div', '', 'sum-list');
@@ -330,19 +457,16 @@ function buildLoansCard(today, totals) {
     return card;
   }
 
-  const totalOwed = roundMoney(loans.reduce((sum, info) => sum + info.outstanding, 0));
-  const overdueInterest = roundMoney(loans.reduce((sum, info) => sum + info.pending * info.interestNext, 0));
-
   const list = el('div', '', 'sum-list');
-  list.appendChild(sumRow(`Me deben en total (${loans.length} ${plural(loans.length, 'préstamo', 'préstamos')})`, formatMoney(totalOwed), 'total'));
+  list.appendChild(sumRow(`Me deben en total (${stats.count} ${plural(stats.count, 'préstamo', 'préstamos')})`, formatMoney(stats.totalOwed)));
   list.appendChild(sumRow('Cobrado en el mes', formatMoney(totals.collectedTotal)));
   list.appendChild(sumRow('   De capital', formatMoney(totals.principalCollected)));
   list.appendChild(sumRow('   De intereses (tu ganancia)', formatMoney(totals.interestCollected), 'in'));
   if (totals.loanedTotal > 0) {
     list.appendChild(sumRow('Prestado en el mes', formatMoney(totals.loanedTotal)));
   }
-  if (overdueInterest > 0) {
-    list.appendChild(sumRow('Intereses vencidos', formatMoney(overdueInterest), 'out'));
+  if (stats.overdueInterest > 0) {
+    list.appendChild(sumRow('Intereses vencidos', formatMoney(stats.overdueInterest), 'out'));
   }
   card.appendChild(list);
   return card;
@@ -374,8 +498,11 @@ function buildUpcomingCard(today) {
 
     const li = el('li', '', 'move');
     const main = el('div', '', 'move__main');
-    main.append(el('div', item.title, 'move__title'), el('div', sub, `move__sub${late ? ' move__sub--late' : ''}`));
-    li.append(main, el('span', formatMoney(item.amount), `move__amount move__amount--${item.kind}`));
+    const title = el('div', item.title, 'move__title');
+    if (late) title.append(' ', el('span', 'Vencido', 'badge badge--late'));
+    else if (days === 0) title.append(' ', el('span', 'Hoy', 'badge badge--today'));
+    main.append(title, el('div', sub, `move__sub${late ? ' move__sub--late' : ''}`));
+    li.append(iconBadge(item.icon, item.tone), main, el('span', formatMoney(item.amount), `move__amount move__amount--${item.kind}`));
     list.appendChild(li);
   }
   card.appendChild(list);
@@ -405,10 +532,11 @@ function buildMovementsCard(month, movements) {
   const ul = el('ul', '', 'move-list');
   for (const m of list.slice(0, MAX_MOVEMENTS)) {
     const d = describeMovement(m);
+    const visual = TYPE_VISUALS[m.type] ?? { icon: 'in', tone: 'save' };
     const li = el('li', '', 'move');
     const main = el('div', '', 'move__main');
     main.append(el('div', d.title, 'move__title'), el('div', `${formatShortDate(m.date)} · ${d.detail}`, 'move__sub'));
-    li.append(main, el('span', d.amount, `move__amount${d.kind ? ` move__amount--${d.kind}` : ''}`));
+    li.append(iconBadge(visual.icon, visual.tone), main, el('span', d.amount, `move__amount${d.kind ? ` move__amount--${d.kind}` : ''}`));
     ul.appendChild(li);
   }
   card.appendChild(ul);
@@ -443,11 +571,13 @@ function draw(container) {
 
   container.append(
     buildMonthNav(container, month, earliest, current),
+    buildHero(month, isCurrent, totals),
+    buildKpis(today),
+    buildUpcomingCard(today),
     buildIncomeCard(month, isCurrent, totals),
     buildSavingsCard(month, isCurrent, totals, movements),
     buildDebtsCard(today, totals),
     buildLoansCard(today, totals),
-    buildUpcomingCard(today),
     buildMovementsCard(month, movements)
   );
 }
