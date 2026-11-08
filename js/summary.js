@@ -1,15 +1,17 @@
 /* =========================================================
    summary.js
    Pantalla "Resumen": todo tu dinero de un vistazo.
+     0. Título con una línea que explica la pantalla.
      1. Selector de mes (‹ ›).
      2. Panel de saldo: disponible, mes anterior, entradas y salidas.
      3. Lo que debo / lo que me deben (situación de hoy).
-     4. Lo que viene (próximos pagos y cobros).
+     4. Próximos pagos y cobros.
      5. Detalle: ingresos y gastos, ahorros, deudas y préstamos.
      6. Movimientos del mes.
    Solo lee los datos: no guarda ni cambia nada.
    ========================================================= */
 
+import { buildViewHeader } from './cards.js';
 import { describeDebt } from './debts.js';
 import { describeLoan } from './loans.js';
 import { getItems } from './storage.js';
@@ -27,7 +29,7 @@ import {
 
 // Máximo de movimientos que se dibujan en la lista del mes
 const MAX_MOVEMENTS = 100;
-// Máximo de renglones en "Lo que viene"
+// Máximo de renglones en "Próximos pagos y cobros"
 const MAX_UPCOMING = 6;
 
 const monthFormatter = new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' });
@@ -315,7 +317,7 @@ function buildHero(month, isCurrent, totals) {
   const hero = el('section', '', 'balance span-all');
   hero.setAttribute('aria-label', 'Saldo del mes');
 
-  hero.appendChild(el('p', isCurrent ? 'Disponible ahora' : 'Disponible al cierre', 'balance__label'));
+  hero.appendChild(el('p', isCurrent ? 'Disponible para gastar' : 'Disponible al cierre del mes', 'balance__label'));
   const available = getAvailableIncome(month);
   hero.appendChild(el('p', formatMoney(available), `balance__amount${available < 0 ? ' is-negative' : ''}`));
 
@@ -324,7 +326,7 @@ function buildHero(month, isCurrent, totals) {
 
   const meta = el('dl', '', 'balance__meta balance__meta--3');
   for (const [label, value, tone] of [
-    ['Mes anterior', formatMoney(getCarryOver(month)), ''],
+    ['Del mes anterior', formatMoney(getCarryOver(month)), ''],
     ['Entradas', `+ ${formatMoney(entries)}`, 'is-in'],
     ['Salidas', `− ${formatMoney(exits)}`, 'is-out'],
   ]) {
@@ -343,7 +345,7 @@ function buildKpis(today) {
   const debts = debtStats(today);
   const debtCard = el('section', '', 'kpi kpi--debt');
   debtCard.append(
-    el('p', 'Debo', 'kpi__label'),
+    el('p', 'Por pagar', 'kpi__label'),
     el('p', formatMoney(debts.totalLeft), 'kpi__amount'),
     el(
       'p',
@@ -359,7 +361,7 @@ function buildKpis(today) {
   const loans = loanStats(today);
   const loanCard = el('section', '', 'kpi kpi--loan');
   loanCard.append(
-    el('p', 'Me deben', 'kpi__label'),
+    el('p', 'Por cobrar', 'kpi__label'),
     el('p', formatMoney(loans.totalOwed), 'kpi__amount'),
     el(
       'p',
@@ -397,7 +399,7 @@ function buildIncomeCard(month, isCurrent, totals) {
   add('Préstamos que diste', totals.prestamos, 'out');
 
   list.appendChild(
-    sumRow(isCurrent ? 'Disponible ahora' : 'Disponible al cierre', formatMoney(getAvailableIncome(month)), 'total')
+    sumRow(isCurrent ? 'Disponible para gastar' : 'Disponible al cierre del mes', formatMoney(getAvailableIncome(month)), 'total')
   );
   card.appendChild(list);
   return card;
@@ -419,7 +421,7 @@ function buildSavingsCard(month, isCurrent, totals, movements) {
 
 function buildDebtsCard(today, totals) {
   const card = el('section', '', 'card');
-  card.appendChild(el('h2', 'Mis deudas'));
+  card.appendChild(el('h2', 'Deudas'));
 
   const stats = debtStats(today);
   if (stats.count === 0) {
@@ -433,7 +435,7 @@ function buildDebtsCard(today, totals) {
   }
 
   const list = el('div', '', 'sum-list');
-  list.appendChild(sumRow(`Debo en total (${stats.count} ${plural(stats.count, 'deuda', 'deudas')})`, formatMoney(stats.totalLeft)));
+  list.appendChild(sumRow(`Total por pagar (${stats.count} ${plural(stats.count, 'deuda', 'deudas')})`, formatMoney(stats.totalLeft)));
   list.appendChild(sumRow('Pagado en el mes', formatMoney(totals.debtPaidTotal)));
   if (stats.overdue > 0) {
     list.appendChild(sumRow('Con pago vencido', `${stats.overdue} ${plural(stats.overdue, 'deuda', 'deudas')}`, 'out'));
@@ -444,7 +446,7 @@ function buildDebtsCard(today, totals) {
 
 function buildLoansCard(today, totals) {
   const card = el('section', '', 'card');
-  card.appendChild(el('h2', 'Mis préstamos'));
+  card.appendChild(el('h2', 'Dinero prestado'));
 
   const stats = loanStats(today);
   if (stats.count === 0) {
@@ -458,7 +460,7 @@ function buildLoansCard(today, totals) {
   }
 
   const list = el('div', '', 'sum-list');
-  list.appendChild(sumRow(`Me deben en total (${stats.count} ${plural(stats.count, 'préstamo', 'préstamos')})`, formatMoney(stats.totalOwed)));
+  list.appendChild(sumRow(`Total por cobrar (${stats.count} ${plural(stats.count, 'préstamo', 'préstamos')})`, formatMoney(stats.totalOwed)));
   list.appendChild(sumRow('Cobrado en el mes', formatMoney(totals.collectedTotal)));
   list.appendChild(sumRow('   De capital', formatMoney(totals.principalCollected)));
   list.appendChild(sumRow('   De intereses (tu ganancia)', formatMoney(totals.interestCollected), 'in'));
@@ -474,7 +476,7 @@ function buildLoansCard(today, totals) {
 
 function buildUpcomingCard(today) {
   const card = el('section', '', 'card span-all');
-  card.appendChild(el('h2', 'Lo que viene'));
+  card.appendChild(el('h2', 'Próximos pagos y cobros'));
 
   const items = upcomingItems(today);
   if (items.length === 0) {
@@ -570,6 +572,7 @@ function draw(container) {
   const totals = summarizeMonth(month, movements);
 
   container.append(
+    buildViewHeader('Resumen', 'Cómo va tu dinero este mes: lo disponible, lo que debes pagar, lo que te deben y tus movimientos.'),
     buildMonthNav(container, month, earliest, current),
     buildHero(month, isCurrent, totals),
     buildKpis(today),

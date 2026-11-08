@@ -16,7 +16,7 @@ import { buildEmpty, buildHero, buildProgress, buildStats, buildViewHeader } fro
 import { activeDate } from './calendar.js';
 import { addItem, getItems, removeItem, updateItem } from './storage.js';
 import { getAvailableIncome, hasEnoughIncome, notEnoughIncomeMessage, updateDisplays } from './transactions.js';
-import { showToast } from './ui.js';
+import { showDialog, showToast } from './ui.js';
 import {
   FREQUENCIES,
   addPeriods,
@@ -32,6 +32,7 @@ import {
   parsePercent,
   roundMoney,
   todayISO,
+  formatAmountText,
 } from './utils.js';
 
 // Por debajo de 1 centavo consideramos que ya no te deben nada
@@ -351,7 +352,7 @@ function openInterestDialog(loan, container, defaultToIncome) {
   });
 
   document.body.appendChild(dialog);
-  dialog.showModal();
+  showDialog(dialog);
 }
 
 function deleteLoan(loan, container) {
@@ -399,11 +400,11 @@ function openPrincipalDialog(loan, container, defaultToIncome) {
   amountLabel.appendChild(document.createTextNode('¿Cuánto te devolvió?'));
   const amountInput = document.createElement('input');
   amountInput.name = 'amount';
-  amountInput.type = 'number';
+  amountInput.type = 'text'; // texto (no "número") para poder mostrar comas: 50,000
   amountInput.inputMode = 'decimal';
-  amountInput.min = '0.01';
-  amountInput.step = '0.01';
-  amountInput.value = String(info.outstanding);
+  amountInput.setAttribute('data-money', '');
+  amountInput.autocomplete = 'off';
+  amountInput.value = formatAmountText(String(info.outstanding));
   amountLabel.appendChild(amountInput);
 
   const preview = el('p', '', 'interest-preview');
@@ -526,9 +527,7 @@ function openPrincipalDialog(loan, container, defaultToIncome) {
   });
 
   document.body.appendChild(dialog);
-  dialog.showModal();
-  amountInput.focus();
-  amountInput.select();
+  showDialog(dialog);
 }
 
 /* =========================================================
@@ -558,8 +557,8 @@ function buildCard(loan, info, today, container) {
   head.append(el('h2', loan.person, 'item-card__name'), statusBadge(loan, info, today));
   card.appendChild(head);
 
-  card.append(el('p', 'Me debe', 'item-card__label'), el('p', formatMoney(info.outstanding), 'item-card__amount'));
-  card.appendChild(buildProgress(loan.amount > 0 ? info.recovered / loan.amount : 0, `${formatMoney(info.recovered)} recuperado`));
+  card.append(el('p', 'Falta por cobrar', 'item-card__label'), el('p', formatMoney(info.outstanding), 'item-card__amount'));
+  card.appendChild(buildProgress(loan.amount > 0 ? info.recovered / loan.amount : 0, `${formatMoney(info.recovered)} cobrado`));
 
   const stats = [
     ['Prestado', formatMoney(loan.amount)],
@@ -616,11 +615,16 @@ export function renderLoans(container) {
       return keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
     });
 
-  container.appendChild(buildViewHeader('Préstamos', 'Agregar', 'sheet-prestamo'));
+  container.appendChild(
+    buildViewHeader('Préstamos', 'Dinero que le prestaste a otras personas y que todavía te deben.')
+  );
 
   if (rows.length === 0) {
     container.appendChild(
-      buildEmpty('Todavía no tienes préstamos', 'Anota a quién le prestaste y cuánto, y la app lleva la cuenta.', 'Agregar préstamo', 'sheet-prestamo')
+      buildEmpty(
+        'Todavía no has prestado dinero',
+        'Aquí verás el dinero que le prestaste a otras personas. Agrégalo desde Inicio, en el botón Préstamo.'
+      )
     );
     return;
   }
@@ -629,10 +633,10 @@ export function renderLoans(container) {
   // Intereses que ya debieron pagarte y todavía no marcas
   const overdueInterest = roundMoney(rows.reduce((sum, r) => sum + r.info.pending * r.info.interestNext, 0));
   container.appendChild(
-    buildHero('Me deben en total', formatMoney(totalOutstanding), [
-      { label: 'Disponible', value: formatMoney(getAvailableIncome()) },
+    buildHero('Total por cobrar', formatMoney(totalOutstanding), [
+      { label: 'Para gastar', value: formatMoney(getAvailableIncome()) },
       { label: 'Préstamos', value: String(rows.length) },
-      { label: 'Interés vencido', value: formatMoney(overdueInterest), tone: overdueInterest > 0 ? 'is-out' : '' },
+      { label: 'Intereses vencidos', value: formatMoney(overdueInterest), tone: overdueInterest > 0 ? 'is-out' : '' },
     ])
   );
 

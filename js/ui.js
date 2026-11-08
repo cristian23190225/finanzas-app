@@ -40,5 +40,19 @@ export function showToast(message, kind = 'ok') {
   hideTimer = setTimeout(() => toast.classList.remove('is-visible'), kind === 'error' ? 4500 : 3000);
 }
 
+/**
+ * Abre una ventana (hoja o diálogo) SIN poner el cursor en un campo:
+ * así el teclado no sale solo y la persona puede leer primero.
+ * El foco inicial se lo lleva el título de la ventana.
+ */
+export function showDialog(dialog) {
+  const title = dialog.querySelector('h2');
+  if (title) {
+    title.tabIndex = -1;
+    title.setAttribute('autofocus', '');
+  }
+  dialog.showModal();
+}
+
 // Se crea desde el inicio para que los lectores de pantalla ya lo conozcan
 ensureToast();

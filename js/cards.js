@@ -1,31 +1,17 @@
 /* =========================================================
    cards.js
-   Piezas de pantalla que comparten Deudas y Préstamos:
-   encabezado con botón "Agregar", panel marino, barra de progreso,
+   Piezas de pantalla que comparten Resumen, Deudas y Préstamos:
+   encabezado con descripción, panel marino, barra de progreso,
    cuadrícula de datos y mensaje de "todavía no hay nada".
    Solo dibuja: no guarda ni cambia datos.
    ========================================================= */
 
 import { el } from './utils.js';
 
-/**
- * Lleva a Inicio y abre la hoja de ese formulario (por ejemplo "sheet-deuda").
- * Los dos avisos los escuchan main.js (cambiar de pantalla) y home.js (abrir la hoja).
- */
-export function openAddSheet(sheetId) {
-  document.dispatchEvent(new CustomEvent('finanzas:ver', { detail: 'inicio' }));
-  document.dispatchEvent(new CustomEvent('finanzas:abrir-hoja', { detail: sheetId }));
-}
-
-/** Encabezado de la pantalla: título a la izquierda y botón "+ Agregar" a la derecha. */
-export function buildViewHeader(title, addLabel, sheetId) {
-  const header = el('header', '', 'home-header');
-  header.appendChild(el('h1', title, 'home-header__title'));
-
-  const add = el('button', `+ ${addLabel}`, 'btn-small');
-  add.type = 'button';
-  add.addEventListener('click', () => openAddSheet(sheetId));
-  header.appendChild(add);
+/** Encabezado de la pantalla: título y una línea que explica para qué sirve. */
+export function buildViewHeader(title, description) {
+  const header = el('header', '', 'view-head');
+  header.append(el('h1', title, 'home-header__title'), el('p', description, 'view-intro'));
   return header;
 }
 
@@ -81,14 +67,9 @@ export function buildStats(pairs) {
   return list;
 }
 
-/** Mensaje cuando todavía no hay nada, con botón para agregar el primero. */
-export function buildEmpty(title, text, buttonLabel, sheetId) {
+/** Mensaje cuando todavía no hay nada (explica qué es y dónde se agrega). */
+export function buildEmpty(title, text) {
   const box = el('section', '', 'empty-state');
   box.append(el('h2', title, 'empty-state__title'), el('p', text, 'empty-state__text'));
-
-  const button = el('button', `+ ${buttonLabel}`, 'btn-small btn-block');
-  button.type = 'button';
-  button.addEventListener('click', () => openAddSheet(sheetId));
-  box.appendChild(button);
   return box;
 }

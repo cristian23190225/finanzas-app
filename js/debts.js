@@ -19,7 +19,7 @@ import { buildEmpty, buildHero, buildProgress, buildStats, buildViewHeader } fro
 import { activeDate } from './calendar.js';
 import { addItem, getItems, removeItem, updateItem } from './storage.js';
 import { getAvailableIncome, hasEnoughIncome, notEnoughIncomeMessage, updateDisplays } from './transactions.js';
-import { showToast } from './ui.js';
+import { showDialog, showToast } from './ui.js';
 import {
   FREQUENCIES,
   FREQUENCY_LABELS,
@@ -35,6 +35,7 @@ import {
   parseAmount,
   roundMoney,
   todayISO,
+  formatAmountText,
 } from './utils.js';
 
 
@@ -380,7 +381,7 @@ function openPaymentDialog(debt, container, defaultFromIncome) {
   });
 
   document.body.appendChild(dialog);
-  dialog.showModal();
+  showDialog(dialog);
 }
 
 function deleteDebt(debt, container) {
@@ -407,11 +408,11 @@ function numberField(labelText, name, value = '') {
   label.appendChild(document.createTextNode(labelText));
   const input = document.createElement('input');
   input.name = name;
-  input.type = 'number';
+  input.type = 'text'; // texto (no "número") para poder mostrar comas: 50,000
   input.inputMode = 'decimal';
-  input.min = '0.01';
-  input.step = '0.01';
-  input.value = value;
+  input.setAttribute('data-money', '');
+  input.autocomplete = 'off';
+  input.value = value === '' ? '' : formatAmountText(value);
   label.appendChild(input);
   return { label, input };
 }
@@ -457,6 +458,9 @@ function openCapitalDialog(debt, container, defaultFromIncome) {
   const extraField = numberField('¿Cuánto abonas a capital?', 'extra');
   const payField = numberField('Pago por periodo después del abono', 'newPayment', String(debt.payment));
   const countField = numberField('O en cuántos pagos quieres terminar', 'count');
+  // "En cuántos pagos" es un número entero normal (sin comas)
+  countField.input.removeAttribute('data-money');
+  countField.input.type = 'number';
   countField.input.min = '1';
   countField.input.step = '1';
   countField.input.inputMode = 'numeric';
@@ -513,7 +517,7 @@ function openCapitalDialog(debt, container, defaultFromIncome) {
   }
 
   function setPayment(value) {
-    payField.input.value = value === null ? '' : String(value);
+    payField.input.value = value === null ? '' : formatAmountText(String(value));
   }
 
   /** Pone en "cuántos pagos" lo que resulta del pago escrito. */
@@ -691,8 +695,7 @@ function openCapitalDialog(debt, container, defaultFromIncome) {
   });
 
   document.body.appendChild(dialog);
-  dialog.showModal();
-  extraField.input.focus();
+  showDialog(dialog);
 }
 
 /**
@@ -819,8 +822,7 @@ function openSettleDialog(debt, container, defaultFromIncome) {
   });
 
   document.body.appendChild(dialog);
-  dialog.showModal();
-  settleField.input.focus();
+  showDialog(dialog);
 }
 
 /* =========================================================
@@ -912,11 +914,16 @@ export function renderDebts(container) {
     .map((debt) => ({ debt, info: describeDebt(debt, today) }))
     .sort((a, b) => (a.info.nextDue < b.info.nextDue ? -1 : a.info.nextDue > b.info.nextDue ? 1 : 0));
 
-  container.appendChild(buildViewHeader('Deudas', 'Agregar', 'sheet-deuda'));
+  container.appendChild(
+    buildViewHeader('Deudas', 'Lo que tienes que pagar cada cierto tiempo o por partes: compras a crédito y dinero que le debes a personas.')
+  );
 
   if (rows.length === 0) {
     container.appendChild(
-      buildEmpty('Todavía no tienes deudas', 'Registra lo que debes y la app te avisa cuándo toca pagar.', 'Agregar deuda', 'sheet-deuda')
+      buildEmpty(
+        'Todavía no tienes deudas',
+        'Una deuda es algo que pagas por partes o cada cierto tiempo. Agrégala desde Inicio, en el botón Deuda.'
+      )
     );
     return;
   }
@@ -924,8 +931,8 @@ export function renderDebts(container) {
   const totalRemaining = roundMoney(rows.reduce((sum, r) => sum + r.info.remaining, 0));
   const overdue = rows.filter((r) => daysBetween(today, r.info.nextDue) < 0).length;
   container.appendChild(
-    buildHero('Debo en total', formatMoney(totalRemaining), [
-      { label: 'Disponible', value: formatMoney(getAvailableIncome()) },
+    buildHero('Total por pagar', formatMoney(totalRemaining), [
+      { label: 'Para gastar', value: formatMoney(getAvailableIncome()) },
       { label: 'Deudas', value: String(rows.length) },
       { label: 'Vencidas', value: String(overdue), tone: overdue > 0 ? 'is-out' : '' },
     ])

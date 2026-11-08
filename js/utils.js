@@ -148,9 +148,27 @@ export function formatMoney(n) {
 
 /** Convierte lo escrito en una cantidad válida (> 0) o devuelve null. */
 export function parseAmount(raw) {
-  const n = typeof raw === 'number' ? raw : Number(String(raw).trim());
+  // Se aceptan comas de miles ("50,000.50"): se quitan antes de convertir
+  const n = typeof raw === 'number' ? raw : Number(String(raw).trim().replace(/,/g, ''));
   if (!Number.isFinite(n) || n <= 0 || n > MAX_AMOUNT) return null;
   return roundMoney(n);
+}
+
+/**
+ * Pone comas de miles a lo que se escribe: "50000.5" -> "50,000.5".
+ * Solo deja números y un punto decimal (máximo 2 decimales y 9 dígitos enteros).
+ */
+export function formatAmountText(raw) {
+  const text = String(raw).replace(/,/g, '').replace(/[^0-9.]/g, '');
+  const dot = text.indexOf('.');
+  let integer = dot === -1 ? text : text.slice(0, dot);
+  const decimals = dot === -1 ? null : text.slice(dot + 1).replace(/\./g, '').slice(0, 2);
+
+  integer = integer.replace(/^0+(?=\d)/, '').slice(0, 9);
+  if (integer === '' && decimals !== null) integer = '0';
+
+  const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return decimals === null ? grouped : `${grouped}.${decimals}`;
 }
 
 /** Igual, pero para porcentajes (entre 0.01 y 100). */

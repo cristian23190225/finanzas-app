@@ -9,6 +9,7 @@
 import { activeDate, initCalendar, onActiveDateChange, onDayChange } from './calendar.js';
 import { initDebts, renderDebts } from './debts.js';
 import { hideSplash, initHome } from './home.js';
+import { initMoneyInputs } from './money-input.js';
 import { initExport } from './export.js';
 import { initLoans, renderLoans } from './loans.js';
 import { initPwa } from './pwa.js';
@@ -251,6 +252,7 @@ function init() {
   initTheme();
   initNavigation();
   initSwipe();
+  initMoneyInputs();
   initCalendar();
   initTransactions();
   initDebts();

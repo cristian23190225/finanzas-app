@@ -99,7 +99,7 @@
     </section>
 
     <!-- Botones: cada uno abre su formulario en una hoja -->
-    <h2 class="section-label">Registrar</h2>
+    <h2 class="section-label">Agregar</h2>
     <div class="tiles">
       <button class="tile tile--in" type="button" data-open-sheet="sheet-ingreso">
         <span class="tile__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg></span>
@@ -115,7 +115,7 @@
       </button>
       <button class="tile tile--back" type="button" data-open-sheet="sheet-retiro">
         <span class="tile__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
-        <span class="tile__label">Retiro</span>
+        <span class="tile__label">Sacar ahorro</span>
       </button>
       <button class="tile tile--debt" type="button" data-open-sheet="sheet-deuda">
         <span class="tile__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
@@ -138,15 +138,15 @@
     <dialog id="sheet-ingreso" class="sheet" aria-labelledby="sheet-ingreso-title">
       <div class="sheet__inner">
         <div class="sheet__head">
-          <h2 id="sheet-ingreso-title" class="sheet__title">Ingreso</h2>
+          <h2 id="sheet-ingreso-title" class="sheet__title">Agregar ingreso</h2>
           <button class="icon-btn" type="button" aria-label="Cerrar" data-close-sheet>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
-        <p class="sheet__hint">Dinero que recibes. Se suma a lo disponible.</p>
+        <p class="sheet__hint">Dinero que recibes, ya sea en efectivo o en tarjeta. Anótalo para llevar un control más preciso de lo que tienes disponible.</p>
         <form id="form-ingreso" autocomplete="off">
                 <label>Cantidad
-                  <input name="amount" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01" required>
+                  <input name="amount" type="text" inputmode="decimal" data-money autocomplete="off" required>
                 </label>
                 <button type="submit">Agregar</button>
               </form>
@@ -155,15 +155,15 @@
     <dialog id="sheet-gasto" class="sheet" aria-labelledby="sheet-gasto-title">
       <div class="sheet__inner">
         <div class="sheet__head">
-          <h2 id="sheet-gasto-title" class="sheet__title">Gasto</h2>
+          <h2 id="sheet-gasto-title" class="sheet__title">Agregar gasto</h2>
           <button class="icon-btn" type="button" aria-label="Cerrar" data-close-sheet>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
-        <p class="sheet__hint">Algo que pagaste. Se resta de lo disponible.</p>
+        <p class="sheet__hint">Algo en lo que gastaste. Se resta de tu dinero disponible para gastar; no se resta de tus ahorros.</p>
         <form id="form-gasto" autocomplete="off">
                 <label>Cantidad
-                  <input name="amount" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01" required>
+                  <input name="amount" type="text" inputmode="decimal" data-money autocomplete="off" required>
                 </label>
                 <label>¿En qué gasté?
                   <input name="note" type="text" maxlength="60" required>
@@ -175,15 +175,15 @@
     <dialog id="sheet-ahorro" class="sheet" aria-labelledby="sheet-ahorro-title">
       <div class="sheet__inner">
         <div class="sheet__head">
-          <h2 id="sheet-ahorro-title" class="sheet__title">Ahorro</h2>
+          <h2 id="sheet-ahorro-title" class="sheet__title">Agregar ahorro</h2>
           <button class="icon-btn" type="button" aria-label="Cerrar" data-close-sheet>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
-        <p class="sheet__hint">Dinero que apartas para guardar.</p>
+        <p class="sheet__hint">Dinero que apartas para guardarlo. Si lo sacas de tu dinero disponible, deja marcada la casilla de restarlo.</p>
         <form id="form-ahorro" autocomplete="off">
                 <label>Cantidad
-                  <input name="amount" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01" required>
+                  <input name="amount" type="text" inputmode="decimal" data-money autocomplete="off" required>
                 </label>
                 <label class="check">
                   <input name="fromIncome" type="checkbox" checked>
@@ -196,15 +196,15 @@
     <dialog id="sheet-retiro" class="sheet" aria-labelledby="sheet-retiro-title">
       <div class="sheet__inner">
         <div class="sheet__head">
-          <h2 id="sheet-retiro-title" class="sheet__title">Retiro</h2>
+          <h2 id="sheet-retiro-title" class="sheet__title">Sacar de mis ahorros</h2>
           <button class="icon-btn" type="button" aria-label="Cerrar" data-close-sheet>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
-        <p class="sheet__hint">Dinero que sacas de tus ahorros. Se suma a lo disponible.</p>
+        <p class="sheet__hint">Dinero que sacas de tus ahorros para poder usarlo. Se suma a tu dinero disponible para gastar.</p>
         <form id="form-retiro" autocomplete="off">
                 <label>Cantidad
-                  <input name="amount" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01" required>
+                  <input name="amount" type="text" inputmode="decimal" data-money autocomplete="off" required>
                 </label>
                 <button type="submit">Agregar</button>
               </form>
@@ -213,21 +213,21 @@
     <dialog id="sheet-deuda" class="sheet" aria-labelledby="sheet-deuda-title">
       <div class="sheet__inner">
         <div class="sheet__head">
-          <h2 id="sheet-deuda-title" class="sheet__title">Deuda</h2>
+          <h2 id="sheet-deuda-title" class="sheet__title">Agregar deuda</h2>
           <button class="icon-btn" type="button" aria-label="Cerrar" data-close-sheet>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
-        <p class="sheet__hint">Algo que debes pagar en abonos.</p>
+        <p class="sheet__hint">Algo que tienes que pagar cada cierto tiempo o por partes: una compra a crédito o dinero que le debes a una persona.</p>
         <form id="form-deuda" autocomplete="off">
                 <label>¿Qué debo?
                   <input name="concept" type="text" maxlength="60" required>
                 </label>
                 <label>Total a pagar (con intereses)
-                  <input name="total" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01" required>
+                  <input name="total" type="text" inputmode="decimal" data-money autocomplete="off" required>
                 </label>
                 <label>Cantidad por pago
-                  <input name="payment" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01" required>
+                  <input name="payment" type="text" inputmode="decimal" data-money autocomplete="off" required>
                 </label>
                 <label>Cada cuánto pago
                   <select name="frequency" required>
@@ -240,10 +240,10 @@
                   <input name="firstPayment" type="date" required>
                 </label>
                 <label>Precio de contado (opcional)
-                  <input name="cashPrice" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01">
+                  <input name="cashPrice" type="text" inputmode="decimal" data-money autocomplete="off">
                 </label>
                 <label>Liquidar hoy (opcional)
-                  <input name="settleAmount" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01">
+                  <input name="settleAmount" type="text" inputmode="decimal" data-money autocomplete="off">
                 </label>
                 <button type="submit">Agregar</button>
               </form>
@@ -252,18 +252,18 @@
     <dialog id="sheet-prestamo" class="sheet" aria-labelledby="sheet-prestamo-title">
       <div class="sheet__inner">
         <div class="sheet__head">
-          <h2 id="sheet-prestamo-title" class="sheet__title">Préstamo</h2>
+          <h2 id="sheet-prestamo-title" class="sheet__title">Dinero que presté</h2>
           <button class="icon-btn" type="button" aria-label="Cerrar" data-close-sheet>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
-        <p class="sheet__hint">Dinero que le prestas a alguien.</p>
+        <p class="sheet__hint">Dinero que le prestaste a alguien y que te va a devolver. Aquí llevas la cuenta de lo que todavía te falta por cobrar.</p>
         <form id="form-prestamo" autocomplete="off">
                 <label>¿A quién le presté?
                   <input name="person" type="text" maxlength="60" required>
                 </label>
                 <label>¿Cuánto le presté?
-                  <input name="amount" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01" required>
+                  <input name="amount" type="text" inputmode="decimal" data-money autocomplete="off" required>
                 </label>
                 <label>Fecha del préstamo
                   <input name="loanDate" type="date" required>

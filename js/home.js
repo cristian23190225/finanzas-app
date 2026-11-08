@@ -8,6 +8,7 @@
    Los formularios y sus reglas siguen en transactions.js, debts.js y loans.js.
    ========================================================= */
 
+import { showDialog } from './ui.js';
 import { formatMoney, roundMoney } from './utils.js';
 
 const reduceMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -18,16 +19,13 @@ const reduceMotion = () => window.matchMedia && window.matchMedia('(prefers-redu
 
 const CLOSE_FALLBACK_MS = 320; // por si la animación de cierre no avisa que terminó
 
-/** Abre una hoja y pone el cursor en su primer campo (así sale el teclado de una vez). */
+/** Abre una hoja SIN poner el cursor en un campo: primero se lee, y el teclado sale cuando tocas un campo. */
 function openSheet(id) {
   const dialog = document.getElementById(id);
   if (!dialog || typeof dialog.showModal !== 'function' || dialog.open) return;
 
   dialog.classList.remove('is-closing');
-  dialog.showModal();
-
-  const firstField = dialog.querySelector('input:not([type="checkbox"]):not([type="hidden"]), select, textarea');
-  if (firstField) firstField.focus({ preventScroll: true });
+  showDialog(dialog);
 }
 
 /** Cierra una hoja con una pequeña animación hacia abajo. */
@@ -73,11 +71,6 @@ function initSheets() {
       form.addEventListener('reset', () => closeSheet(dialog));
     }
   }
-
-  // Otras pantallas (Deudas, Préstamos) piden abrir una hoja con este aviso
-  document.addEventListener('finanzas:abrir-hoja', (event) => {
-    if (typeof event.detail === 'string') openSheet(event.detail);
-  });
 
   // Al elegir un día en el calendario, la hoja del calendario se cierra sola
   document.addEventListener('finanzas:dia-elegido', () => {

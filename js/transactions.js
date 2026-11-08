@@ -17,7 +17,7 @@ const FORMS = [
   { formId: 'form-ingreso', type: 'ingreso', success: 'Ingreso agregado' },
   { formId: 'form-ahorro', type: 'ahorro', success: 'Ahorro agregado', hasIncomeOption: true },
   { formId: 'form-gasto', type: 'gasto', success: 'Gasto agregado', needsNote: true },
-  { formId: 'form-retiro', type: 'retiro', success: 'Retiro registrado' },
+  { formId: 'form-retiro', type: 'retiro', success: 'Ahorro retirado' },
 ];
 
 /* =========================================================

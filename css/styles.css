@@ -1948,19 +1948,31 @@ body:has(dialog[open]) {
 }
 
 .empty-state__text {
-  margin: 0 0 1.1rem;
+  margin: 0;
   color: var(--muted);
   font-size: 0.92rem;
-}
-
-.empty-state .btn-small {
-  max-width: 16rem;
 }
 
 @media (min-width: 768px) {
   .item-list {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+/* Título de cada pantalla con una línea que explica para qué sirve */
+.view-head {
+  margin-bottom: 1rem;
+}
+
+.view-intro {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+/* El título de una ventana recibe el foco al abrirla (para que no salga el teclado): sin recuadro */
+dialog h2[tabindex="-1"]:focus {
+  outline: none;
 }
 
 /* =========================================================
