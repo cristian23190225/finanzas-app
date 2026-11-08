@@ -12,6 +12,7 @@
      interés por cobro baja.
    ========================================================= */
 
+import { buildEmpty, buildHero, buildProgress, buildStats, buildViewHeader } from './cards.js';
 import { activeDate } from './calendar.js';
 import { addItem, getItems, removeItem, updateItem } from './storage.js';
 import { getAvailableIncome, hasEnoughIncome, notEnoughIncomeMessage, updateDisplays } from './transactions.js';
@@ -549,44 +550,35 @@ function statusBadge(loan, info, today) {
   return el('span', `Faltan ${days} día${days === 1 ? '' : 's'}`, 'badge');
 }
 
-/**
- * Crea un dato de la tarjeta con su etiqueta (data-label).
- * El CSS muestra la etiqueta arriba y el valor debajo.
- */
-function cell(label, content, className = '') {
-  const td = el('td', content, className);
-  td.setAttribute('data-label', label);
-  return td;
-}
+/** Una tarjeta por préstamo: lo que te deben, avance, datos clave y botones. */
+function buildCard(loan, info, today, container) {
+  const card = el('article', '', 'item-card');
 
-function buildRow(loan, info, today, container) {
-  const row = document.createElement('tr');
+  const head = el('div', '', 'item-card__head');
+  head.append(el('h2', loan.person, 'item-card__name'), statusBadge(loan, info, today));
+  card.appendChild(head);
 
-  // Arriba de la tarjeta: nombre y estado
-  const titleCell = el('td', '', 'cell-title');
-  titleCell.appendChild(el('span', loan.person, 'cell-title__name'));
-  titleCell.appendChild(statusBadge(loan, info, today));
-  row.appendChild(titleCell);
+  card.append(el('p', 'Me debe', 'item-card__label'), el('p', formatMoney(info.outstanding), 'item-card__amount'));
+  card.appendChild(buildProgress(loan.amount > 0 ? info.recovered / loan.amount : 0, `${formatMoney(info.recovered)} recuperado`));
 
-  row.appendChild(cell('Me debe', formatMoney(info.outstanding), 'num cell-credit'));
-  row.appendChild(cell('Prestado', formatMoney(loan.amount), 'num'));
-  row.appendChild(cell('Fecha del préstamo', formatShortDate(loan.date)));
-
-  if (info.recovered > 0) {
-    row.appendChild(cell('Capital recuperado', formatMoney(info.recovered), 'num'));
+  const stats = [
+    ['Prestado', formatMoney(loan.amount)],
+    ['Fecha del préstamo', formatShortDate(loan.date)],
+  ];
+  if (loan.hasInterest) {
+    stats.push(
+      ['Interés', `${loan.rate}% ${FREQUENCY_PHRASE[loan.frequency]}`],
+      ['Interés por cobro', formatMoney(info.interestNext)],
+      ['Próximo cobro', formatShortDate(info.nextDue)],
+      ['Intereses cobrados', formatMoney(info.interestCollected)]
+    );
   }
+  card.appendChild(buildStats(stats));
+
+  const actions = el('div', '', 'item-card__actions');
 
   if (loan.hasInterest) {
-    row.appendChild(cell('Interés', `${loan.rate}% ${FREQUENCY_PHRASE[loan.frequency]}`));
-    row.appendChild(cell('Interés por cobro', formatMoney(info.interestNext), 'num cell-credit'));
-    row.appendChild(cell('Próximo cobro', formatShortDate(info.nextDue)));
-    row.appendChild(cell('Intereses cobrados', formatMoney(info.interestCollected), 'num'));
-  }
-
-  const actions = el('td', '', 'actions');
-
-  if (loan.hasInterest) {
-    const interestButton = el('button', 'Cobré el interés', 'btn-small');
+    const interestButton = el('button', 'Cobré el interés', 'btn-small btn-block');
     interestButton.type = 'button';
     interestButton.addEventListener('click', () => openInterestDialog(loan, container, true));
     actions.appendChild(interestButton);
@@ -595,7 +587,7 @@ function buildRow(loan, info, today, container) {
   const principalButton = el(
     'button',
     'Cobré capital',
-    loan.hasInterest ? 'btn-small btn-small--outline' : 'btn-small'
+    loan.hasInterest ? 'btn-small btn-small--outline' : 'btn-small btn-block'
   );
   principalButton.type = 'button';
   principalButton.addEventListener('click', () => openPrincipalDialog(loan, container, true));
@@ -605,9 +597,9 @@ function buildRow(loan, info, today, container) {
   deleteButton.addEventListener('click', () => deleteLoan(loan, container));
 
   actions.append(principalButton, deleteButton);
-  row.appendChild(actions);
+  card.appendChild(actions);
 
-  return row;
+  return card;
 }
 
 /** Dibuja la pantalla de Préstamos dentro de su contenedor. */
@@ -624,59 +616,32 @@ export function renderLoans(container) {
       return keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
     });
 
-  // Tarjeta de arriba: préstamos a la izquierda, ingresos a la derecha
-  const summary = el('section', '', 'card');
+  container.appendChild(buildViewHeader('Préstamos', 'Agregar', 'sheet-prestamo'));
 
   if (rows.length === 0) {
-    summary.appendChild(el('h2', 'Mis préstamos'));
-    summary.appendChild(el('p', 'No tienes préstamos registrados.', 'card__total'));
-    container.appendChild(summary);
+    container.appendChild(
+      buildEmpty('Todavía no tienes préstamos', 'Anota a quién le prestaste y cuánto, y la app lleva la cuenta.', 'Agregar préstamo', 'sheet-prestamo')
+    );
     return;
   }
 
-  const top = el('div', '', 'debts-top');
-
-  // Lado izquierdo: cuánto te deben
-  const loansSide = el('div', '', 'debts-top__side');
-  loansSide.appendChild(el('h2', 'Mis préstamos'));
   const totalOutstanding = roundMoney(rows.reduce((sum, r) => sum + r.info.outstanding, 0));
-  const totalLine = el('p', 'Me deben en total: ', 'card__total');
-  totalLine.appendChild(el('strong', formatMoney(totalOutstanding)));
-  loansSide.appendChild(totalLine);
-
   // Intereses que ya debieron pagarte y todavía no marcas
   const overdueInterest = roundMoney(rows.reduce((sum, r) => sum + r.info.pending * r.info.interestNext, 0));
-  if (overdueInterest > 0) {
-    const overdueLine = el('p', 'Intereses vencidos: ', 'card__total');
-    overdueLine.appendChild(el('strong', formatMoney(overdueInterest)));
-    loansSide.appendChild(overdueLine);
-  }
+  container.appendChild(
+    buildHero('Me deben en total', formatMoney(totalOutstanding), [
+      { label: 'Disponible', value: formatMoney(getAvailableIncome()) },
+      { label: 'Préstamos', value: String(rows.length) },
+      { label: 'Interés vencido', value: formatMoney(overdueInterest), tone: overdueInterest > 0 ? 'is-out' : '' },
+    ])
+  );
 
-  // Lado derecho: Mis ingresos
-  const incomeSide = el('div', '', 'debts-top__side');
-  incomeSide.appendChild(el('h2', 'Mis ingresos'));
-  const incomeLine = el('p', 'Disponible: ', 'card__total');
-  incomeLine.appendChild(el('strong', formatMoney(getAvailableIncome())));
-  incomeSide.appendChild(incomeLine);
-
-  top.append(loansSide, incomeSide);
-  summary.appendChild(top);
-  container.appendChild(summary);
-
-  // Una tarjeta por préstamo (el CSS las acomoda según el ancho de la pantalla)
-  const card = el('section', '', 'card');
-  const wrap = el('div', '', 'table-wrap');
-  const table = el('table', '', 'table');
-
-  const tbody = document.createElement('tbody');
+  // Una tarjeta por préstamo (en pantallas grandes van en dos columnas)
+  const list = el('div', '', 'item-list');
   for (const { loan, info } of rows) {
-    tbody.appendChild(buildRow(loan, info, today, container));
+    list.appendChild(buildCard(loan, info, today, container));
   }
-
-  table.appendChild(tbody);
-  wrap.appendChild(table);
-  card.appendChild(wrap);
-  container.appendChild(card);
+  container.appendChild(list);
 }
 
 /* =========================================================

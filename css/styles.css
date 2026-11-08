@@ -1776,6 +1776,194 @@ body:has(dialog[open]) {
 }
 
 /* =========================================================
+   DEUDAS Y PRÉSTAMOS: una tarjeta por elemento
+   ========================================================= */
+
+#view-deudas .balance,
+#view-prestamos .balance {
+  margin-bottom: 1rem;
+}
+
+.item-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.9rem;
+}
+
+.item-card {
+  --item-color: var(--accent);
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-left: 5px solid var(--item-color);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+#view-deudas .item-card {
+  --item-color: var(--warn);
+}
+
+#view-prestamos .item-card {
+  --item-color: var(--teal);
+}
+
+.item-card__head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.item-card__name {
+  margin: 0;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.item-card__label {
+  margin: 0.85rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.item-card__amount {
+  margin: 0.1rem 0 0.65rem;
+  font-size: clamp(1.6rem, 8vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Barra de avance */
+.progress {
+  height: 0.55rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.progress__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--item-color);
+  transform-origin: left center;
+  transition: transform 0.45s ease;
+}
+
+.progress__text {
+  margin: 0.4rem 0 1rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Datos clave en dos columnas */
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem 1rem;
+  margin: 0 0 1rem;
+}
+
+.stats dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.stats dd {
+  margin: 0.1rem 0 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* Detalle plegable del crédito */
+.item-card__more {
+  margin: -0.2rem 0 1rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+
+.item-card__more summary {
+  display: flex;
+  align-items: center;
+  min-height: 2.2rem;
+  color: var(--accent);
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.item-card__more .stats {
+  margin: 0.6rem 0 0;
+}
+
+/* Botones de la tarjeta */
+.btn-block {
+  width: 100%;
+  min-height: 2.9rem;
+  font-size: 1rem;
+}
+
+.item-card__actions {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.item-card__actions-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.item-card__actions .btn-small--outline,
+.item-card__actions > .btn-small {
+  min-height: 2.7rem;
+  font-size: 0.95rem;
+}
+
+.item-card__actions .btn-small--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--danger);
+}
+
+/* Cuando todavía no hay nada */
+.empty-state {
+  padding: 1.8rem 1.2rem;
+  border: 1px dashed var(--input-border);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.empty-state__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.1rem;
+}
+
+.empty-state__text {
+  margin: 0 0 1.1rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.empty-state .btn-small {
+  max-width: 16rem;
+}
+
+@media (min-width: 768px) {
+  .item-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* =========================================================
    MODO OSCURO
    theme.js pone data-theme="dark" en <html>. Casi todo cambia solo
    porque los colores están en las variables; aquí se ajusta lo demás.

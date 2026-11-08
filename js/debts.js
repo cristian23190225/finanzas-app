@@ -15,6 +15,7 @@
        precio de contado, el total y el pago de cada periodo.
    ========================================================= */
 
+import { buildEmpty, buildHero, buildProgress, buildStats, buildViewHeader } from './cards.js';
 import { activeDate } from './calendar.js';
 import { addItem, getItems, removeItem, updateItem } from './storage.js';
 import { getAvailableIncome, hasEnoughIncome, notEnoughIncomeMessage, updateDisplays } from './transactions.js';
@@ -839,45 +840,45 @@ function statusBadge(info, today) {
   return el('span', `Faltan ${days} día${days === 1 ? '' : 's'}`, 'badge');
 }
 
-/**
- * Crea un dato de la tarjeta con su etiqueta (data-label).
- * El CSS muestra la etiqueta arriba y el valor debajo.
- */
-function cell(label, content, className = '') {
-  const td = el('td', content, className);
-  td.setAttribute('data-label', label);
-  return td;
-}
+/** Una tarjeta por deuda: lo que falta, avance, datos clave y botones. */
+function buildCard(debt, info, today, container) {
+  const card = el('article', '', 'item-card');
 
-/** Parte de arriba de la tarjeta: el nombre de la deuda y su estado. */
-function titleCell(debt, info, today) {
-  const td = el('td', '', 'cell-title');
-  td.appendChild(el('span', debt.concept, 'cell-title__name'));
-  td.appendChild(statusBadge(info, today));
-  return td;
-}
+  const head = el('div', '', 'item-card__head');
+  head.append(el('h2', debt.concept, 'item-card__name'), statusBadge(info, today));
+  card.appendChild(head);
 
-function buildRow(debt, info, today, container) {
-  const row = document.createElement('tr');
+  card.append(el('p', 'Falta pagar', 'item-card__label'), el('p', formatMoney(info.remaining), 'item-card__amount'));
 
-  row.appendChild(titleCell(debt, info, today));
-  row.appendChild(cell('Pago', formatMoney(debt.payment), 'num'));
-  row.appendChild(cell('Cada cuánto', FREQUENCY_LABELS[debt.frequency]));
-  row.appendChild(cell('Próximo pago', formatShortDate(info.nextDue)));
-  row.appendChild(cell('Pagos que faltan', String(info.paymentsLeft), 'num'));
-  row.appendChild(cell('Pagado', formatMoney(info.paid), 'num'));
-  row.appendChild(cell('Falta pagar', formatMoney(info.remaining), 'num'));
+  const contract = info.paid + info.remaining;
+  card.appendChild(buildProgress(contract > 0 ? info.paid / contract : 0, `${formatMoney(info.paid)} pagado`));
 
-  // Solo en compras a crédito con interés: capital, intereses y tasa
+  card.appendChild(
+    buildStats([
+      ['Próximo pago', formatShortDate(info.nextDue)],
+      ['Pago', formatMoney(debt.payment)],
+      ['Cada cuánto', FREQUENCY_LABELS[debt.frequency]],
+      ['Pagos que faltan', String(info.paymentsLeft)],
+    ])
+  );
+
+  // Solo en compras a crédito con interés: capital, intereses y tasa (plegable)
   if (info.rate > 0) {
-    row.appendChild(cell('Capital que falta', formatMoney(info.balance), 'num cell-credit'));
-    row.appendChild(cell('Intereses que faltan', formatMoney(info.interestLeft), 'num cell-credit'));
-    row.appendChild(cell('Tasa estimada', describeRate(info.rate, debt.frequency), 'cell-credit'));
+    const more = el('details', '', 'item-card__more');
+    more.appendChild(el('summary', 'Detalle del crédito'));
+    more.appendChild(
+      buildStats([
+        ['Capital que falta', formatMoney(info.balance)],
+        ['Intereses que faltan', formatMoney(info.interestLeft)],
+        ['Tasa estimada', describeRate(info.rate, debt.frequency)],
+      ])
+    );
+    card.appendChild(more);
   }
 
-  const actions = el('td', '', 'actions');
+  const actions = el('div', '', 'item-card__actions');
 
-  const payButton = el('button', 'Marcar pago', 'btn-small');
+  const payButton = el('button', 'Marcar pago', 'btn-small btn-block');
   payButton.type = 'button';
   payButton.addEventListener('click', () => openPaymentDialog(debt, container, true));
 
@@ -893,13 +894,14 @@ function buildRow(debt, info, today, container) {
   deleteButton.type = 'button';
   deleteButton.addEventListener('click', () => deleteDebt(debt, container));
 
-  actions.append(payButton, capitalButton, settleButton, deleteButton);
-  row.appendChild(actions);
+  const row = el('div', '', 'item-card__actions-row');
+  row.append(capitalButton, settleButton);
+  actions.append(payButton, row, deleteButton);
+  card.appendChild(actions);
 
-  return row;
+  return card;
 }
 
-/** Dibuja la pantalla de Deudas dentro de su contenedor. */
 /** Dibuja la pantalla de Deudas dentro de su contenedor. */
 export function renderDebts(container) {
   clear(container);
@@ -910,51 +912,31 @@ export function renderDebts(container) {
     .map((debt) => ({ debt, info: describeDebt(debt, today) }))
     .sort((a, b) => (a.info.nextDue < b.info.nextDue ? -1 : a.info.nextDue > b.info.nextDue ? 1 : 0));
 
-  // Tarjeta de arriba: deudas a la izquierda, ingresos a la derecha
-  const summary = el('section', '', 'card');
+  container.appendChild(buildViewHeader('Deudas', 'Agregar', 'sheet-deuda'));
 
   if (rows.length === 0) {
-    summary.appendChild(el('h2', 'Mis deudas'));
-    summary.appendChild(el('p', 'No tienes deudas registradas.', 'card__total'));
-    container.appendChild(summary);
+    container.appendChild(
+      buildEmpty('Todavía no tienes deudas', 'Registra lo que debes y la app te avisa cuándo toca pagar.', 'Agregar deuda', 'sheet-deuda')
+    );
     return;
   }
 
-  const top = el('div', '', 'debts-top');
-
-  // Lado izquierdo: Mis deudas
-  const debtsSide = el('div', '', 'debts-top__side');
-  debtsSide.appendChild(el('h2', 'Mis deudas'));
   const totalRemaining = roundMoney(rows.reduce((sum, r) => sum + r.info.remaining, 0));
-  const totalLine = el('p', 'Debo en total: ', 'card__total');
-  totalLine.appendChild(el('strong', formatMoney(totalRemaining)));
-  debtsSide.appendChild(totalLine);
+  const overdue = rows.filter((r) => daysBetween(today, r.info.nextDue) < 0).length;
+  container.appendChild(
+    buildHero('Debo en total', formatMoney(totalRemaining), [
+      { label: 'Disponible', value: formatMoney(getAvailableIncome()) },
+      { label: 'Deudas', value: String(rows.length) },
+      { label: 'Vencidas', value: String(overdue), tone: overdue > 0 ? 'is-out' : '' },
+    ])
+  );
 
-  // Lado derecho: Mis ingresos
-  const incomeSide = el('div', '', 'debts-top__side');
-  incomeSide.appendChild(el('h2', 'Mis ingresos'));
-  const incomeLine = el('p', 'Disponible: ', 'card__total');
-  incomeLine.appendChild(el('strong', formatMoney(getAvailableIncome())));
-  incomeSide.appendChild(incomeLine);
-
-  top.append(debtsSide, incomeSide);
-  summary.appendChild(top);
-  container.appendChild(summary);
-
-  // Una tarjeta por deuda (el CSS las acomoda según el ancho de la pantalla)
-  const card = el('section', '', 'card');
-  const wrap = el('div', '', 'table-wrap');
-  const table = el('table', '', 'table');
-
-  const tbody = document.createElement('tbody');
+  // Una tarjeta por deuda (en pantallas grandes van en dos columnas)
+  const list = el('div', '', 'item-list');
   for (const { debt, info } of rows) {
-    tbody.appendChild(buildRow(debt, info, today, container));
+    list.appendChild(buildCard(debt, info, today, container));
   }
-
-  table.appendChild(tbody);
-  wrap.appendChild(table);
-  card.appendChild(wrap);
-  container.appendChild(card);
+  container.appendChild(list);
 }
 
 /* =========================================================

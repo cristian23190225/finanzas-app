@@ -74,6 +74,11 @@ function initSheets() {
     }
   }
 
+  // Otras pantallas (Deudas, Préstamos) piden abrir una hoja con este aviso
+  document.addEventListener('finanzas:abrir-hoja', (event) => {
+    if (typeof event.detail === 'string') openSheet(event.detail);
+  });
+
   // Al elegir un día en el calendario, la hoja del calendario se cierra sola
   document.addEventListener('finanzas:dia-elegido', () => {
     closeSheet(document.getElementById('sheet-calendario'));
