@@ -46,6 +46,83 @@ function closeSheet(dialog) {
   setTimeout(finish, CLOSE_FALLBACK_MS);
 }
 
+/* Arrastrar la hoja hacia abajo para cerrarla (solo cuando está arriba del todo) */
+const DRAG_CLOSE_PX = 90;      // distancia que basta para cerrar
+const DRAG_CLOSE_SPEED = 0.6;  // o un jalón rápido (px por ms)
+
+function enableDragToClose(dialog) {
+  let drag = null;
+
+  const reset = () => {
+    dialog.style.transition = '';
+    dialog.style.transform = '';
+  };
+
+  dialog.addEventListener(
+    'touchstart',
+    (event) => {
+      // Solo un dedo y con la hoja arriba del todo (si no, la persona está haciendo scroll)
+      if (event.touches.length !== 1 || dialog.scrollTop > 0 || dialog.classList.contains('is-closing')) {
+        drag = null;
+        return;
+      }
+      drag = { y: event.touches[0].clientY, time: Date.now(), dy: 0, active: false };
+    },
+    { passive: true }
+  );
+
+  dialog.addEventListener(
+    'touchmove',
+    (event) => {
+      if (!drag) return;
+      const dy = event.touches[0].clientY - drag.y;
+      if (dy <= 0 || dialog.scrollTop > 0) {
+        // Subió o hizo scroll: no es un gesto de cerrar
+        if (drag.active) reset();
+        drag = null;
+        return;
+      }
+      drag.active = true;
+      drag.dy = dy;
+      dialog.style.transition = 'none';
+      dialog.style.transform = `translateY(${dy}px)`;
+      if (event.cancelable) event.preventDefault(); // la hoja se mueve, la página no
+    },
+    { passive: false }
+  );
+
+  const release = () => {
+    if (!drag) return;
+    const { dy, active, time } = drag;
+    drag = null;
+    if (!active) return;
+
+    const fast = dy / Math.max(Date.now() - time, 1) > DRAG_CLOSE_SPEED;
+    if (dy < DRAG_CLOSE_PX && !fast) {
+      // Poco arrastre: regresa a su lugar
+      dialog.style.transition = reduceMotion() ? 'none' : 'transform 0.2s ease-out';
+      dialog.style.transform = 'translateY(0)';
+      setTimeout(reset, 220);
+      return;
+    }
+
+    // Lo suficiente: termina de bajar y cierra
+    const done = () => {
+      reset();
+      if (dialog.open) dialog.close();
+    };
+    if (reduceMotion()) {
+      done();
+      return;
+    }
+    dialog.style.transition = 'transform 0.18s ease-in';
+    dialog.style.transform = 'translateY(100%)';
+    setTimeout(done, 190);
+  };
+  dialog.addEventListener('touchend', release, { passive: true });
+  dialog.addEventListener('touchcancel', release, { passive: true });
+}
+
 function initSheets() {
   // Botones que abren una hoja: <button data-open-sheet="sheet-gasto">
   for (const button of document.querySelectorAll('[data-open-sheet]')) {
@@ -53,6 +130,7 @@ function initSheets() {
   }
 
   for (const dialog of document.querySelectorAll('dialog.sheet')) {
+    enableDragToClose(dialog);
     // Botón "×"
     for (const close of dialog.querySelectorAll('[data-close-sheet]')) {
       close.addEventListener('click', () => closeSheet(dialog));
