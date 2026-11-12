@@ -1978,6 +1978,15 @@ dialog h2[tabindex="-1"]:focus {
   outline: none;
 }
 
+/* ---- Reporte del mes (Inicio): selector de mes encima de los botones ---- */
+.report-month {
+  margin-bottom: 0.75rem;
+}
+
+.report-month .month-nav__label {
+  font-size: 1rem;
+}
+
 /* =========================================================
    MODO OSCURO
    theme.js pone data-theme="dark" en <html>. Casi todo cambia solo

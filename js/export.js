@@ -36,6 +36,8 @@ const TYPE_LABELS = {
   cobro_prestamo: 'Cobro de capital',
 };
 
+const MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/; // "2026-11"
+
 const monthFormatter = new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' });
 
 /* =========================================================
@@ -94,6 +96,7 @@ function buildMonths(movements, today) {
       else if (m.type === 'ahorro') ahorrado += m.amount;
     }
     rows.push({
+      key,
       label: monthLabel(key),
       ingresos: roundMoney(ingresos),
       gastos: roundMoney(gastos),
@@ -110,9 +113,12 @@ function buildMonths(movements, today) {
   return rows.reverse(); // el mes más reciente primero
 }
 
-function buildReport() {
+/** period = "2026-11" para un solo mes; null para todos los meses. */
+function buildReport(period = null) {
+  const periodKey = typeof period === 'string' && MONTH_KEY.test(period) ? period : null;
   const today = todayISO();
-  const movements = sortedMovements();
+  const allMovements = sortedMovements();
+  const movements = periodKey ? allMovements.filter((m) => monthKey(m.date) === periodKey) : allMovements;
 
   const debts = getItems('debts').map((debt) => ({ debt, info: describeDebt(debt, today) }));
   const loans = getItems('loans').map((loan) => ({ loan, info: describeLoan(loan, today) }));
@@ -123,6 +129,8 @@ function buildReport() {
 
   return {
     today,
+    periodKey,
+    period: periodKey ? monthLabel(periodKey) : '',
     summary: [
       ['Disponible para gastar', getAvailableIncome()],
       ['Ahorro actual', getSavingBalance()],
@@ -130,7 +138,7 @@ function buildReport() {
       ['Me deben en total', owed],
       ['Intereses cobrados (ganancia)', interestEarned],
     ],
-    months: buildMonths(movements, today),
+    months: buildMonths(allMovements, today).filter((row) => !periodKey || row.key === periodKey),
     movements: movements.map((m) => ({
       date: m.date,
       type: TYPE_LABELS[m.type] ?? m.type,
@@ -203,8 +211,8 @@ async function deliver(blob, fileName, mimeType) {
   return true;
 }
 
-function fileName(extension) {
-  return `finanzas-${todayISO()}.${extension}`;
+function fileName(extension, periodKey = null) {
+  return `finanzas-${periodKey || todayISO()}.${extension}`;
 }
 
 /* =========================================================
@@ -229,7 +237,13 @@ async function buildPdf(report) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.setTextColor(110);
-  doc.text(`Reporte al ${formatShortDate(report.today)}`, PDF_MARGIN, y);
+  doc.text(
+    report.period
+      ? `Reporte de ${report.period} · generado el ${formatShortDate(report.today)}`
+      : `Reporte al ${formatShortDate(report.today)}`,
+    PDF_MARGIN,
+    y
+  );
   y += 4.5;
   doc.setFontSize(8);
   doc.text('Este PDF incluye un respaldo: puedes restaurar tus datos en la app (Ajustes > Restaurar mis datos).', PDF_MARGIN, y);
@@ -507,19 +521,95 @@ function wireButton(id, busyText, run) {
   });
 }
 
-/** Genera y entrega el PDF. Devuelve true si se guardó/compartió. */
-export async function downloadPdf() {
-  const blob = await buildPdf(buildReport());
-  return deliver(blob, fileName('pdf'), 'application/pdf');
+/** Genera y entrega el PDF. period = "2026-11" (un mes) o nada (todos los meses). Devuelve true si se guardó/compartió. */
+export async function downloadPdf(period = null) {
+  const report = buildReport(period);
+  const blob = await buildPdf(report);
+  return deliver(blob, fileName('pdf', report.periodKey), 'application/pdf');
 }
 
-/** Genera y entrega el Excel. Devuelve true si se guardó/compartió. */
-export async function downloadExcel() {
-  const blob = await buildExcel(buildReport());
-  return deliver(blob, fileName('xlsx'), XLSX_MIME);
+/** Genera y entrega el Excel. period = "2026-11" (un mes) o nada (todos los meses). Devuelve true si se guardó/compartió. */
+export async function downloadExcel(period = null) {
+  const report = buildReport(period);
+  const blob = await buildExcel(report);
+  return deliver(blob, fileName('xlsx', report.periodKey), XLSX_MIME);
+}
+
+/* =========================================================
+   6. SELECTOR DE MES (Inicio > Reporte de tus movimientos del mes)
+   Por defecto el mes actual. Las flechas recorren los meses con
+   movimientos y, al final, "Todos los meses".
+   ========================================================= */
+
+const ALL_MONTHS = 'all';
+let reportChoice = null; // "2026-11" o ALL_MONTHS; null = mes actual
+
+/** Meses desde el primer movimiento hasta hoy (más antiguo primero) y, al final, "Todos los meses". */
+function reportOptions() {
+  const current = monthKey(todayISO());
+  let earliest = current;
+  for (const m of getItems('transactions')) {
+    if (monthKey(m.date) < earliest) earliest = monthKey(m.date);
+  }
+  const options = [];
+  let [year, month] = earliest.split('-').map(Number);
+  for (let i = 0; i < 600; i++) {
+    const key = `${year}-${String(month).padStart(2, '0')}`;
+    if (key > current) break;
+    options.push(key);
+    month++;
+    if (month > 12) {
+      month = 1;
+      year++;
+    }
+  }
+  options.push(ALL_MONTHS);
+  return options;
+}
+
+/** La opción elegida (si ya no existe, vuelve al mes actual). */
+function resolveChoice(options) {
+  if (reportChoice && options.includes(reportChoice)) return reportChoice;
+  reportChoice = options[options.length - 2]; // el mes actual
+  return reportChoice;
+}
+
+function drawReportMonth() {
+  const label = document.getElementById('report-month-label');
+  const prev = document.getElementById('report-prev');
+  const next = document.getElementById('report-next');
+  if (!label || !prev || !next) return;
+
+  const options = reportOptions();
+  const index = options.indexOf(resolveChoice(options));
+  label.textContent = reportChoice === ALL_MONTHS ? 'Todos los meses' : monthLabel(reportChoice);
+  prev.disabled = index <= 0;
+  next.disabled = index >= options.length - 1;
+}
+
+function moveReportMonth(step) {
+  const options = reportOptions();
+  const index = options.indexOf(resolveChoice(options)) + step;
+  if (index < 0 || index >= options.length) return;
+  reportChoice = options[index];
+  drawReportMonth();
+}
+
+/** El mes elegido para descargar: "2026-11", o null si eligió "Todos los meses". */
+function chosenPeriod() {
+  const choice = resolveChoice(reportOptions());
+  return choice === ALL_MONTHS ? null : choice;
 }
 
 export function initExport() {
-  wireButton('btn-export-pdf', 'Preparando PDF…', downloadPdf);
-  wireButton('btn-export-xlsx', 'Preparando Excel…', downloadExcel);
+  document.getElementById('report-prev')?.addEventListener('click', () => moveReportMonth(-1));
+  document.getElementById('report-next')?.addEventListener('click', () => moveReportMonth(1));
+  // Se actualiza cada vez que vuelves a Inicio (por si hubo movimientos nuevos o cambió el mes)
+  if (typeof MutationObserver !== 'undefined') {
+    new MutationObserver(drawReportMonth).observe(document.body, { attributes: true, attributeFilter: ['data-view'] });
+  }
+  drawReportMonth();
+
+  wireButton('btn-export-pdf', 'Preparando PDF…', () => downloadPdf(chosenPeriod()));
+  wireButton('btn-export-xlsx', 'Preparando Excel…', () => downloadExcel(chosenPeriod()));
 }
