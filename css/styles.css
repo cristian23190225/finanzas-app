@@ -2066,6 +2066,43 @@ dialog h2[tabindex="-1"]:focus {
   font-weight: 700;
 }
 
+/* ---- Aviso de protección de datos (Inicio) ---- */
+.notice {
+  margin: 0 0 0.9rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 0.9rem;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.notice[data-kind="blocked"] {
+  border-left-color: var(--danger);
+}
+
+.notice[data-kind="recovered"] {
+  border-left-color: var(--success);
+}
+
+.notice__text {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.notice__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.notice__actions .btn-small {
+  min-width: 6.5rem;
+}
+
 /* =========================================================
    MODO OSCURO
    theme.js pone data-theme="dark" en <html>. Casi todo cambia solo

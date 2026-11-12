@@ -12,7 +12,7 @@ import { BACKUP_SHEET, backupExcelCells, createBackupPayload, embedBackupInPdf }
 import { describeDebt } from './debts.js';
 import { describeLoan } from './loans.js';
 import { loadLib } from './libs.js';
-import { getItems } from './storage.js';
+import { getItems, markBackupDone } from './storage.js';
 import { getAvailableIncome, getSavingBalance, incomeEffect } from './transactions.js';
 import { showToast } from './ui.js';
 import {
@@ -522,18 +522,30 @@ function wireButton(id, busyText, run) {
   });
 }
 
+/**
+ * Si el archivo se guardó, anota la fecha del respaldo (todo PDF y Excel lleva adentro
+ * una copia COMPLETA de los datos, sea de un mes o de todo el historial) y avisa a la pantalla.
+ */
+function noteBackup(saved) {
+  if (saved) {
+    markBackupDone();
+    document.dispatchEvent(new CustomEvent('finanzas:respaldo'));
+  }
+  return saved;
+}
+
 /** Genera y entrega el PDF. period = "2026-11" (un mes) o nada (todos los meses). Devuelve true si se guardó/compartió. */
 export async function downloadPdf(period = null) {
   const report = buildReport(period);
   const blob = await buildPdf(report);
-  return deliver(blob, fileName('pdf', report.periodKey), 'application/pdf');
+  return noteBackup(await deliver(blob, fileName('pdf', report.periodKey), 'application/pdf'));
 }
 
 /** Genera y entrega el Excel. period = "2026-11" (un mes) o nada (todos los meses). Devuelve true si se guardó/compartió. */
 export async function downloadExcel(period = null) {
   const report = buildReport(period);
   const blob = await buildExcel(report);
-  return deliver(blob, fileName('xlsx', report.periodKey), XLSX_MIME);
+  return noteBackup(await deliver(blob, fileName('xlsx', report.periodKey), XLSX_MIME));
 }
 
 /* =========================================================

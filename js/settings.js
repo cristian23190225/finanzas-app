@@ -13,6 +13,7 @@ import { refreshCalendar } from './calendar.js';
 import { downloadExcel, downloadPdf } from './export.js';
 import { clearAllData, getItems, mergeBackup, previewMerge } from './storage.js';
 import { PwaError, getAppInfo, updateApp } from './pwa.js';
+import { buildProtectionCard } from './protect.js';
 import { chooseTheme, getCurrentTheme } from './theme.js';
 import { updateDisplays } from './transactions.js';
 import { showToast } from './ui.js';
@@ -377,6 +378,7 @@ export function renderSettings(container) {
 
   container.appendChild(buildThemeCard());
   container.appendChild(buildRestoreCard());
+  container.appendChild(buildProtectionCard());
   container.appendChild(buildAppCard());
   container.appendChild(buildDeleteCard());
 }

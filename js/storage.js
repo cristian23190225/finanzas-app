@@ -15,10 +15,16 @@ import {
   newId,
   parseAmount,
   parsePercent,
+  todayISO,
 } from './utils.js';
+import { vaultClear, vaultRead, vaultSave } from './vault.js';
 
 const STORAGE_KEY = 'finanzas-app:data';
 const CORRUPT_KEY = 'finanzas-app:data-corrupt';
+const META_KEY = 'finanzas-app:meta';       // fechas de último respaldo, último cambio y avisos pospuestos
+const CLEARED_KEY = 'finanzas-app:cleared'; // marca: la persona borró sus datos a propósito (no recuperar)
+const MIRROR_DELAY_MS = 300;                // espera antes de actualizar la copia interna (agrupa cambios seguidos)
+const DAY_MS = 24 * 60 * 60 * 1000;
 const CURRENT_VERSION = 1;
 const MAX_BACKUP_BYTES = 5 * 1024 * 1024; // 5 MB
 const MAX_PAYMENTS = 2000;
@@ -241,20 +247,113 @@ function db() {
   return data;
 }
 
+/** Por qué falló un guardado: 'full' (sin espacio), 'blocked' (el navegador lo bloquea) u 'other'. */
+function saveErrorKind(error) {
+  const name = error && error.name;
+  if (name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED' || (error && (error.code === 22 || error.code === 1014))) {
+    return 'full';
+  }
+  if (name === 'SecurityError') return 'blocked';
+  return 'other';
+}
+
+/** Avisa a la pantalla que no se pudo guardar (main.js muestra el mensaje). Sale después del aviso de cada módulo. */
+function reportSaveFailure(error) {
+  const kind = saveErrorKind(error);
+  setTimeout(() => {
+    try {
+      document.dispatchEvent(new CustomEvent('finanzas:guardado-fallo', { detail: kind }));
+    } catch {
+      /* sin pantalla (pruebas): no pasa nada */
+    }
+  }, 0);
+}
+
 function save() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(db()));
-    return true;
   } catch (error) {
     console.error('No se pudo guardar:', error);
+    reportSaveFailure(error);
     return false;
   }
+  try {
+    localStorage.removeItem(CLEARED_KEY); // ya hay datos nuevos: la marca de "borrado a propósito" deja de servir
+  } catch {
+    /* no es grave */
+  }
+  touchMeta();
+  scheduleMirror();
+  return true;
+}
+
+/* ---- Copia interna (IndexedDB, ver vault.js) ---- */
+
+let mirrorTimer = null;
+
+/** Programa la actualización de la copia interna (si hay varios cambios seguidos, se hace una sola vez). */
+function scheduleMirror() {
+  clearTimeout(mirrorTimer);
+  mirrorTimer = setTimeout(flushMirror, MIRROR_DELAY_MS);
+}
+
+/** Actualiza la copia interna ya mismo. */
+export function flushMirror() {
+  clearTimeout(mirrorTimer);
+  mirrorTimer = null;
+  if (data === null) return Promise.resolve(false);
+  return vaultSave(JSON.stringify(data), todayISO());
+}
+
+/* ---- Marcas de tiempo (respaldos y avisos) ---- */
+
+const META_DATE_FIELDS = ['lastBackup', 'lastChange', 'firstChange', 'snoozeBackupUntil', 'snoozeInstallUntil'];
+
+function readMeta() {
+  const meta = {};
+  try {
+    const parsed = JSON.parse(localStorage.getItem(META_KEY) ?? 'null');
+    if (isPlainObject(parsed)) {
+      for (const field of META_DATE_FIELDS) {
+        const value = parsed[field];
+        if (typeof value === 'string' && value.length <= 40 && !Number.isNaN(Date.parse(value))) meta[field] = value;
+      }
+    }
+  } catch {
+    /* sin marcas todavía */
+  }
+  return meta;
+}
+
+function writeMeta(meta) {
+  try {
+    localStorage.setItem(META_KEY, JSON.stringify(meta));
+  } catch {
+    /* si no cabe, solo se pierde el recordatorio */
+  }
+}
+
+/** Anota que hubo un cambio (para saber si hay algo nuevo sin respaldar). */
+function touchMeta() {
+  const meta = readMeta();
+  const now = new Date().toISOString();
+  meta.lastChange = now;
+  if (!meta.firstChange) meta.firstChange = now;
+  writeMeta(meta);
 }
 
 // Si la app está abierta en dos pestañas, la otra pestaña pudo cambiar
 // los datos: recargamos para no pisar sus cambios al guardar.
 window.addEventListener('storage', (event) => {
   if (event.key === STORAGE_KEY) data = load();
+});
+
+// Al salir de la app o mandarla al fondo, la copia interna se actualiza sin esperar
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && mirrorTimer !== null) flushMirror();
+});
+window.addEventListener('pagehide', () => {
+  if (mirrorTimer !== null) flushMirror();
 });
 
 /* =========================================================
@@ -337,6 +436,44 @@ export async function requestPersistence() {
   return false;
 }
 
+/**
+ * Cómo está la protección del almacenamiento:
+ * { supported, persisted, usage, quota } (usage y quota en bytes, o null si el navegador no los da).
+ */
+export async function getPersistenceInfo() {
+  const info = { supported: false, persisted: false, usage: null, quota: null };
+  try {
+    if (navigator.storage && typeof navigator.storage.persisted === 'function') {
+      info.supported = true;
+      info.persisted = await navigator.storage.persisted();
+    }
+  } catch {
+    /* el navegador no contesta: queda como "no garantizado" */
+  }
+  try {
+    if (navigator.storage && typeof navigator.storage.estimate === 'function') {
+      const estimate = await navigator.storage.estimate();
+      info.usage = Number.isFinite(estimate.usage) ? estimate.usage : null;
+      info.quota = Number.isFinite(estimate.quota) ? estimate.quota : null;
+    }
+  } catch {
+    /* igual */
+  }
+  return info;
+}
+
+/** ¿El navegador deja guardar datos? (En algunos modos privados o con ajustes estrictos no.) */
+export function canStoreData() {
+  try {
+    const probe = 'finanzas-app:probe';
+    localStorage.setItem(probe, '1');
+    localStorage.removeItem(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Devuelve todos los datos como texto JSON (para el respaldo). */
 export function exportBackup() {
   return JSON.stringify(db(), null, 2);
@@ -359,6 +496,117 @@ export function importBackup(text) {
   }
 }
 
+
+/* =========================================================
+   4a. RECUPERACIÓN AUTOMÁTICA Y RECORDATORIO DE RESPALDO
+   ========================================================= */
+
+function countRecords(clean) {
+  return Object.keys(SANITIZERS).reduce((sum, name) => sum + clean[name].length, 0);
+}
+
+/**
+ * Se llama UNA vez al abrir la app, antes de mostrar datos.
+ * Si localStorage está vacío (o dañado) pero la copia interna tiene tus datos,
+ * los recupera. Si borraste tus datos a propósito, NO recupera nada.
+ * Devuelve { savedAt, records } si recuperó, o null.
+ */
+export async function recoverFromVault() {
+  let raw;
+  let clearedOnPurpose;
+  try {
+    raw = localStorage.getItem(STORAGE_KEY);
+    clearedOnPurpose = localStorage.getItem(CLEARED_KEY) !== null;
+  } catch {
+    return null; // el navegador bloquea el almacenamiento: no hay dónde recuperar
+  }
+
+  let needsRecovery = raw === null;
+  if (raw !== null) {
+    try {
+      JSON.parse(raw);
+    } catch {
+      keepCorruptCopy(raw); // por si quieres rescatar algo a mano
+      needsRecovery = true;
+    }
+  }
+
+  if (!needsRecovery) {
+    // Todo bien: se asegura que exista una copia interna (la primera vez después de actualizar la app)
+    db();
+    scheduleMirror();
+    return null;
+  }
+  if (raw === null && clearedOnPurpose) return null;
+
+  for (const snapshot of await vaultRead()) {
+    try {
+      const { data: clean } = sanitizeData(JSON.parse(snapshot.json));
+      const records = countRecords(clean);
+      if (records === 0) continue; // una copia vacía no sirve para recuperar
+      data = clean;
+      if (!save()) {
+        data = null;
+        return null;
+      }
+      return { savedAt: snapshot.savedAt, records };
+    } catch {
+      /* esta copia no sirve: se prueba la anterior */
+    }
+  }
+  return null;
+}
+
+/** Anota que se descargó un respaldo (PDF o Excel: los dos llevan una copia completa de los datos). */
+export function markBackupDone() {
+  const meta = readMeta();
+  meta.lastBackup = new Date().toISOString();
+  writeMeta(meta);
+}
+
+/**
+ * Estado del respaldo para el recordatorio:
+ * { hasData, lastBackup (texto ISO o null), daysSince (días desde el último respaldo, o null si nunca), due }
+ * "due" = ya toca avisar: hay datos, pasaron 7 días o más, hubo cambios desde el último respaldo y no se pospuso.
+ */
+export function getBackupStatus(now = new Date()) {
+  const hasData = countRecords(db()) > 0;
+  const meta = readMeta();
+  if (hasData && !meta.firstChange) {
+    meta.firstChange = now.toISOString(); // datos de antes de existir el recordatorio: se empieza a contar hoy
+    writeMeta(meta);
+  }
+
+  const lastBackup = meta.lastBackup ?? null;
+  const daysSince = lastBackup ? Math.max(0, Math.floor((now - Date.parse(lastBackup)) / DAY_MS)) : null;
+  const reference = Date.parse(lastBackup ?? meta.firstChange ?? now.toISOString());
+  const waited = Math.floor((now - reference) / DAY_MS) >= 7;
+  const changedSince = !lastBackup || (meta.lastChange && Date.parse(meta.lastChange) > Date.parse(lastBackup));
+  const snoozed = meta.snoozeBackupUntil && Date.parse(meta.snoozeBackupUntil) > now.getTime();
+
+  return { hasData, lastBackup, daysSince, due: Boolean(hasData && waited && changedSince && !snoozed) };
+}
+
+/** Pospone un aviso: kind = 'backup' o 'install'. */
+export function snoozeNotice(kind, days) {
+  if (kind !== 'backup' && kind !== 'install') return;
+  const meta = readMeta();
+  meta[kind === 'backup' ? 'snoozeBackupUntil' : 'snoozeInstallUntil'] = new Date(Date.now() + days * DAY_MS).toISOString();
+  writeMeta(meta);
+}
+
+/** ¿Este aviso está pospuesto todavía? */
+export function isNoticeSnoozed(kind) {
+  const meta = readMeta();
+  const until = kind === 'backup' ? meta.snoozeBackupUntil : meta.snoozeInstallUntil;
+  return Boolean(until && Date.parse(until) > Date.now());
+}
+
+/** Fecha y hora de la última copia interna (texto ISO) o null. */
+export async function getVaultInfo() {
+  const [latest] = await vaultRead();
+  return latest ? latest.savedAt : null;
+}
 
 /* =========================================================
    4b. RESTAURAR DESDE UN ARCHIVO (PDF o Excel descargado)
@@ -435,11 +683,16 @@ export function clearAllData() {
   try {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(CORRUPT_KEY);
+    localStorage.removeItem(META_KEY);
+    localStorage.setItem(CLEARED_KEY, '1'); // así la copia interna no "resucita" lo que borraste
   } catch (error) {
     console.error('No se pudieron borrar los datos:', error);
     return false;
   }
+  clearTimeout(mirrorTimer);
+  mirrorTimer = null;
   data = emptyData();
+  vaultClear(); // también se borra la copia interna (no lanza errores)
   return true;
 }
 

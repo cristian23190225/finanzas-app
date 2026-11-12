@@ -15,6 +15,8 @@
   <meta name="theme-color" content="#14213D">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="referrer" content="no-referrer">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <!-- Aplica el modo oscuro/claro guardado ANTES de dibujar la página (evita el parpadeo) -->
@@ -77,6 +79,15 @@
         </svg>
       </button>
     </header>
+
+    <!-- Aviso de protección de datos (solo se ve cuando hace falta) -->
+    <section id="home-notice" class="notice" role="status" hidden>
+      <p id="home-notice-text" class="notice__text"></p>
+      <div class="notice__actions">
+        <button id="home-notice-action" class="btn-small btn-small--outline" type="button" hidden></button>
+        <button id="home-notice-later" class="btn-small btn-small--ghost" type="button" hidden></button>
+      </div>
+    </section>
 
     <!-- Panel de saldo -->
     <section class="balance" aria-labelledby="balance-label">

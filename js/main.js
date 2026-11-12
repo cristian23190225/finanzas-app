@@ -12,8 +12,9 @@ import { hideSplash, initHome } from './home.js';
 import { initMoneyInputs } from './money-input.js';
 import { initExport } from './export.js';
 import { initLoans, renderLoans } from './loans.js';
+import { announceRecovery, initProtection } from './protect.js';
 import { initPwa } from './pwa.js';
-import { requestPersistence } from './storage.js';
+import { recoverFromVault, requestPersistence } from './storage.js';
 import { initTheme } from './theme.js';
 import { renderSettings } from './settings.js';
 import { renderSummary } from './summary.js';
@@ -248,7 +249,21 @@ function fillTodayDates(today, previous = '') {
    4. ARRANQUE
    ========================================================= */
 
-function init() {
+/** Recupera los datos de la copia interna si localStorage amaneció vacío (no espera más de 5 s). */
+async function recoverDataIfNeeded() {
+  try {
+    const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 5000));
+    return await Promise.race([recoverFromVault(), timeout]);
+  } catch (error) {
+    console.error('No se pudo revisar la copia interna:', error);
+    return null;
+  }
+}
+
+async function init() {
+  // Antes de mostrar cualquier dato: si se perdieron, se recuperan de la copia interna
+  const recovered = await recoverDataIfNeeded();
+
   initTheme();
   initNavigation();
   initSwipe();
@@ -259,6 +274,8 @@ function init() {
   initLoans();
   initExport();
   initHome();
+  initProtection();
+  announceRecovery(recovered);
 
   fillTodayDates(activeDate());
   // Si cambia el día real (medianoche) o eliges otro día en el calendario,
@@ -276,4 +293,7 @@ function init() {
   hideSplash();
 }
 
-init();
+init().catch((error) => {
+  console.error('Error al iniciar la app:', error);
+  hideSplash(); // que la pantalla de carga no se quede tapando
+});
