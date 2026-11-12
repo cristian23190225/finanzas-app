@@ -1978,13 +1978,92 @@ dialog h2[tabindex="-1"]:focus {
   outline: none;
 }
 
-/* ---- Reporte del mes (Inicio): selector de mes encima de los botones ---- */
+/* ---- Reporte (Inicio): "Un mes" / "Todo el historial" + selector de mes ---- */
+.report-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.report-mode__btn {
+  min-height: 2.6rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.report-mode__btn[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
 .report-month {
   margin-bottom: 0.75rem;
 }
 
-.report-month .month-nav__label {
+/* El nombre del mes es un botón: abre la lista de meses */
+.report-month__pick {
+  min-height: 2.6rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.report-month__pick::after {
+  content: "▾";
+  margin-left: 0.4rem;
+  color: var(--accent);
+  font-size: 0.85em;
+}
+
+/* Hoja "Elige un mes": meses agrupados por año */
+.month-pick__year {
+  margin: 1rem 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.month-pick__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.month-pick__btn {
+  min-height: 2.75rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--input-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.month-pick__btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
 }
 
 /* =========================================================

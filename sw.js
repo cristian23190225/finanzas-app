@@ -17,7 +17,7 @@
    agrégalo también a la lista FILES de abajo.
    ========================================================= */
 
-const VERSION = 9;
+const VERSION = 10;
 
 const CACHE_PREFIX = 'finanzas-app-';
 const CACHE_NAME = `${CACHE_PREFIX}v${VERSION}`;

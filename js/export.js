@@ -17,6 +17,7 @@ import { getAvailableIncome, getSavingBalance, incomeEffect } from './transactio
 import { showToast } from './ui.js';
 import {
   FREQUENCY_LABELS,
+  el,
   formatMoney,
   formatShortDate,
   monthKey,
@@ -536,79 +537,111 @@ export async function downloadExcel(period = null) {
 }
 
 /* =========================================================
-   6. SELECTOR DE MES (Inicio > Reporte de tus movimientos del mes)
-   Por defecto el mes actual. Las flechas recorren los meses con
-   movimientos y, al final, "Todos los meses".
+   6. SELECTOR DEL REPORTE (Inicio > Reporte de tus movimientos)
+   "Un mes" (por defecto el actual; las flechas saltan entre meses
+   con movimientos y el nombre abre la lista) o "Todo el historial".
    ========================================================= */
 
-const ALL_MONTHS = 'all';
-let reportChoice = null; // "2026-11" o ALL_MONTHS; null = mes actual
+const monthNameFormatter = new Intl.DateTimeFormat('es-MX', { month: 'long' });
 
-/** Meses desde el primer movimiento hasta hoy (más antiguo primero) y, al final, "Todos los meses". */
-function reportOptions() {
-  const current = monthKey(todayISO());
-  let earliest = current;
-  for (const m of getItems('transactions')) {
-    if (monthKey(m.date) < earliest) earliest = monthKey(m.date);
-  }
-  const options = [];
-  let [year, month] = earliest.split('-').map(Number);
-  for (let i = 0; i < 600; i++) {
-    const key = `${year}-${String(month).padStart(2, '0')}`;
-    if (key > current) break;
-    options.push(key);
-    month++;
-    if (month > 12) {
-      month = 1;
-      year++;
-    }
-  }
-  options.push(ALL_MONTHS);
-  return options;
+let reportMode = 'month'; // 'month' | 'all'
+let reportChoice = null;  // "2026-11"
+
+/** Meses con movimientos (el más antiguo primero). El mes actual siempre está. */
+function reportMonths() {
+  const keys = new Set([monthKey(todayISO())]);
+  for (const m of getItems('transactions')) keys.add(monthKey(m.date));
+  return [...keys].sort();
 }
 
-/** La opción elegida (si ya no existe, vuelve al mes actual). */
-function resolveChoice(options) {
-  if (reportChoice && options.includes(reportChoice)) return reportChoice;
-  reportChoice = options[options.length - 2]; // el mes actual
+/** El mes elegido; si ya no existe, vuelve al mes actual. */
+function resolveMonth(months) {
+  if (!reportChoice || !months.includes(reportChoice)) reportChoice = monthKey(todayISO());
   return reportChoice;
 }
 
-function drawReportMonth() {
+function drawReportPicker() {
+  const nav = document.getElementById('report-month-nav');
   const label = document.getElementById('report-month-label');
   const prev = document.getElementById('report-prev');
   const next = document.getElementById('report-next');
-  if (!label || !prev || !next) return;
+  if (!nav || !label || !prev || !next) return;
 
-  const options = reportOptions();
-  const index = options.indexOf(resolveChoice(options));
-  label.textContent = reportChoice === ALL_MONTHS ? 'Todos los meses' : monthLabel(reportChoice);
+  const months = reportMonths();
+  const choice = resolveMonth(months);
+  const index = months.indexOf(choice);
+
+  for (const [id, mode] of [['report-mode-month', 'month'], ['report-mode-all', 'all']]) {
+    document.getElementById(id)?.setAttribute('aria-pressed', String(reportMode === mode));
+  }
+  nav.hidden = reportMode === 'all';
+  label.textContent = monthLabel(choice);
   prev.disabled = index <= 0;
-  next.disabled = index >= options.length - 1;
+  next.disabled = index >= months.length - 1;
 }
 
 function moveReportMonth(step) {
-  const options = reportOptions();
-  const index = options.indexOf(resolveChoice(options)) + step;
-  if (index < 0 || index >= options.length) return;
-  reportChoice = options[index];
-  drawReportMonth();
+  const months = reportMonths();
+  const index = months.indexOf(resolveMonth(months)) + step;
+  if (index < 0 || index >= months.length) return;
+  reportChoice = months[index];
+  drawReportPicker();
 }
 
-/** El mes elegido para descargar: "2026-11", o null si eligió "Todos los meses". */
+/** Llena la hoja "Elige un mes": años de más nuevo a más viejo, con sus meses. */
+function fillMonthList() {
+  const list = document.getElementById('report-month-list');
+  if (!list) return;
+  list.replaceChildren();
+
+  const months = reportMonths();
+  const chosen = resolveMonth(months);
+  const years = [...new Set(months.map((key) => key.slice(0, 4)))].sort().reverse();
+
+  for (const year of years) {
+    list.appendChild(el('h3', year, 'month-pick__year'));
+    const grid = el('div', '', 'month-pick__grid');
+    for (const key of months.filter((k) => k.startsWith(year))) {
+      const [y, m] = key.split('-').map(Number);
+      const name = monthNameFormatter.format(new Date(y, m - 1, 1));
+      const button = el('button', name.charAt(0).toUpperCase() + name.slice(1), 'month-pick__btn');
+      button.type = 'button';
+      button.setAttribute('aria-label', monthLabel(key));
+      button.setAttribute('aria-pressed', String(key === chosen));
+      button.addEventListener('click', () => {
+        reportChoice = key;
+        reportMode = 'month';
+        drawReportPicker();
+        document.querySelector('#sheet-meses [data-close-sheet]')?.click(); // cierra la hoja con su animación
+      });
+      grid.appendChild(button);
+    }
+    list.appendChild(grid);
+  }
+}
+
+/** El mes elegido para descargar: "2026-11", o null si eligió "Todo el historial". */
 function chosenPeriod() {
-  const choice = resolveChoice(reportOptions());
-  return choice === ALL_MONTHS ? null : choice;
+  return reportMode === 'all' ? null : resolveMonth(reportMonths());
 }
 
 export function initExport() {
   document.getElementById('report-prev')?.addEventListener('click', () => moveReportMonth(-1));
   document.getElementById('report-next')?.addEventListener('click', () => moveReportMonth(1));
+  document.getElementById('report-month-label')?.addEventListener('click', fillMonthList);
+  document.getElementById('report-mode-month')?.addEventListener('click', () => {
+    reportMode = 'month';
+    drawReportPicker();
+  });
+  document.getElementById('report-mode-all')?.addEventListener('click', () => {
+    reportMode = 'all';
+    drawReportPicker();
+  });
   // Se actualiza cada vez que vuelves a Inicio (por si hubo movimientos nuevos o cambió el mes)
   if (typeof MutationObserver !== 'undefined') {
-    new MutationObserver(drawReportMonth).observe(document.body, { attributes: true, attributeFilter: ['data-view'] });
+    new MutationObserver(drawReportPicker).observe(document.body, { attributes: true, attributeFilter: ['data-view'] });
   }
-  drawReportMonth();
+  drawReportPicker();
 
   wireButton('btn-export-pdf', 'Preparando PDF…', () => downloadPdf(chosenPeriod()));
   wireButton('btn-export-xlsx', 'Preparando Excel…', () => downloadExcel(chosenPeriod()));
