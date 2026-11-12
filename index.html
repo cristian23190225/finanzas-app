@@ -130,19 +130,7 @@
 
     <!-- Reportes -->
     <h2 class="section-label">Reporte de tus movimientos</h2>
-    <div class="report-mode">
-      <button id="report-mode-month" class="report-mode__btn" type="button" aria-pressed="true">Un mes</button>
-      <button id="report-mode-all" class="report-mode__btn" type="button" aria-pressed="false">Todo el historial</button>
-    </div>
-    <div id="report-month-nav" class="month-nav report-month">
-      <button id="report-prev" class="btn-small btn-small--outline" type="button" aria-label="Mes anterior">‹</button>
-      <button id="report-month-label" class="month-nav__label report-month__pick" type="button" data-open-sheet="sheet-meses" aria-label="Elegir otro mes"></button>
-      <button id="report-next" class="btn-small btn-small--outline" type="button" aria-label="Mes siguiente">›</button>
-    </div>
-    <div class="actions-row">
-      <button id="btn-export-pdf" class="btn-secondary" type="button">Descargar PDF</button>
-      <button id="btn-export-xlsx" class="btn-secondary" type="button">Descargar Excel</button>
-    </div>
+    <button class="btn-secondary" type="button" data-open-sheet="sheet-reporte">Descargar reporte</button>
 
     <!-- ============ HOJAS (formularios) ============ -->
     <dialog id="sheet-ingreso" class="sheet" aria-labelledby="sheet-ingreso-title">
@@ -321,6 +309,31 @@
           <div id="calendar-grid" class="calendar__grid"></div>
           <p id="today-label" class="calendar__today"></p>
         </section>
+      </div>
+    </dialog>
+
+    <dialog id="sheet-reporte" class="sheet" aria-labelledby="sheet-reporte-title">
+      <div class="sheet__inner">
+        <div class="sheet__head">
+          <h2 id="sheet-reporte-title" class="sheet__title">Reporte de tus movimientos</h2>
+          <button class="icon-btn" type="button" aria-label="Cerrar" data-close-sheet>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <p class="sheet__hint">Elige qué parte de tu historial quieres descargar.</p>
+        <div class="report-mode">
+          <button id="report-mode-month" class="report-mode__btn" type="button" aria-pressed="true">Un mes</button>
+          <button id="report-mode-all" class="report-mode__btn" type="button" aria-pressed="false">Todo el historial</button>
+        </div>
+        <div id="report-month-nav" class="month-nav report-month">
+          <button id="report-prev" class="btn-small btn-small--outline" type="button" aria-label="Mes anterior">‹</button>
+          <button id="report-month-label" class="month-nav__label report-month__pick" type="button" data-open-sheet="sheet-meses" aria-label="Elegir otro mes"></button>
+          <button id="report-next" class="btn-small btn-small--outline" type="button" aria-label="Mes siguiente">›</button>
+        </div>
+        <div class="actions-row">
+          <button id="btn-export-pdf" class="btn-secondary" type="button">Descargar PDF</button>
+          <button id="btn-export-xlsx" class="btn-secondary" type="button">Descargar Excel</button>
+        </div>
       </div>
     </dialog>
 
