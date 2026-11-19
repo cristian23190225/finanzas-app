@@ -11,7 +11,6 @@
    La lógica y el acceso a los datos viven en storage.js y vault.js.
    ========================================================= */
 
-import { downloadExcel, downloadPdf } from './export.js';
 import {
   canStoreData,
   getBackupStatus,
@@ -22,7 +21,7 @@ import {
   snoozeNotice,
 } from './storage.js';
 import { showDialog, showToast } from './ui.js';
-import { el } from './utils.js';
+import { clear, el } from './utils.js';
 
 const BACKUP_SNOOZE_DAYS = 3;
 const INSTALL_SNOOZE_DAYS = 7;
@@ -66,10 +65,27 @@ window.addEventListener('appinstalled', () => {
   refreshNotice();
 });
 
-/** Pasos para instalar, según el teléfono. */
-function installSteps() {
-  if (isIPhone()) return 'Toca el botón Compartir de Safari y luego «Agregar a inicio».';
-  return 'Abre el menú ⋮ del navegador y elige «Instalar app» o «Agregar a pantalla de inicio».';
+/** Navegadores y pasos para instalar la app (los nombres de los botones pueden variar un poco según la versión). */
+const INSTALL_GUIDES = {
+  iphone: [
+    ['Safari', 'Toca Compartir (el cuadro con la flecha hacia arriba), baja y elige «Agregar a inicio». Luego toca «Agregar».'],
+    ['Chrome', 'Toca Compartir (junto a la barra de direcciones) y elige «Agregar a pantalla de inicio». Luego toca «Agregar».'],
+    ['Brave', 'Toca el menú ⋯, elige «Compartir» y luego «Agregar a pantalla de inicio». Luego toca «Agregar».'],
+    ['Edge', 'Toca el menú ⋯, elige «Compartir» y luego «Agregar a pantalla de inicio». Luego toca «Agregar».'],
+    ['Firefox', 'Toca el menú ☰, elige «Compartir» y luego «Agregar a pantalla de inicio». Luego toca «Agregar».'],
+  ],
+  android: [
+    ['Chrome', 'Toca el menú ⋮ y elige «Instalar app» (o «Agregar a pantalla de inicio»). Luego toca «Instalar».'],
+    ['Brave', 'Toca el menú ⋮ y elige «Instalar app» (o «Agregar a pantalla de inicio»). Luego toca «Instalar».'],
+    ['Edge', 'Toca el menú ≡ y elige «Agregar al teléfono» (o «Instalar app»). Luego confirma.'],
+    ['Firefox', 'Toca el menú ⋮ y elige «Instalar» (o «Agregar a pantalla de inicio»). Luego confirma.'],
+    ['Samsung Internet', 'Toca el menú ≡, elige «Agregar página a» y luego «Pantalla de inicio». Luego confirma.'],
+  ],
+};
+
+/** Los navegadores que le tocan a este teléfono. */
+function installGuide() {
+  return isIPhone() ? INSTALL_GUIDES.iphone : INSTALL_GUIDES.android;
 }
 
 /* =========================================================
@@ -97,10 +113,8 @@ function pickNotice() {
   if ((isIPhone() || isAndroid()) && !isInstalled() && !isNoticeSnoozed('install')) {
     return {
       kind: 'install',
-      text: installPrompt
-        ? 'Instala la app para que el navegador cuide mejor tus datos.'
-        : `Instala la app para que el navegador cuide mejor tus datos. ${installSteps()}`,
-      action: installPrompt ? 'Instalar' : null,
+      text: 'Instala la app para que el navegador cuide mejor tus datos.',
+      action: installPrompt ? 'Instalar' : 'Ver cómo',
       later: 'Más tarde',
     };
   }
@@ -158,6 +172,11 @@ async function onNoticeAction() {
       /* la persona canceló */
     }
     refreshNotice();
+    return;
+  }
+  if (currentNotice.kind === 'install') {
+    // Los pasos están en Ajustes > Protección de tus datos > "Cómo instalar en…"
+    document.dispatchEvent(new CustomEvent('finanzas:ver', { detail: 'ajustes' }));
     return;
   }
   // 'recovered' y 'backup': ir a descargar el respaldo
@@ -236,25 +255,62 @@ function backupText(status) {
   return `Último respaldo descargado: hace ${status.daysSince} días.`;
 }
 
-/** Botón de descarga de respaldo (PDF o Excel con TODO el historial). */
-function backupDownloadButton(label, run, onDone) {
-  const button = el('button', label, 'btn-secondary');
-  button.type = 'button';
-  button.addEventListener('click', async () => {
-    button.disabled = true;
-    button.textContent = 'Preparando…';
-    try {
-      await run();
-      onDone();
-    } catch (error) {
-      console.error('Error al descargar el respaldo:', error);
-      showToast('No se pudo generar el respaldo. Intenta de nuevo.', 'error');
-    } finally {
-      button.disabled = false;
-      button.textContent = label;
+/**
+ * Botón "Cómo instalar en…": al tocarlo salen los navegadores; al elegir uno,
+ * los demás se quitan y abajo salen sus pasos (con un botón para elegir otro).
+ */
+function buildInstallHelp() {
+  const wrapper = el('div', '', 'install-help');
+  const toggle = el('button', 'Cómo instalar en…', 'btn-secondary');
+  toggle.type = 'button';
+  toggle.setAttribute('aria-expanded', 'false');
+
+  const panel = el('div', '', 'install-help__panel');
+  panel.hidden = true;
+
+  /** selected = nombre del navegador elegido, o null para ver la lista */
+  function draw(selected) {
+    clear(panel);
+    const guide = installGuide();
+    const chosen = guide.find(([name]) => name === selected);
+
+    if (!chosen) {
+      const tabs = el('div', '', 'browser-tabs');
+      for (const [name] of guide) {
+        const tab = el('button', name, 'browser-tab');
+        tab.type = 'button';
+        tab.setAttribute('aria-pressed', 'false');
+        tab.addEventListener('click', () => draw(name));
+        tabs.appendChild(tab);
+      }
+      panel.appendChild(tabs);
+      return;
     }
+
+    const tabs = el('div', '', 'browser-tabs');
+    const current = el('button', chosen[0], 'browser-tab');
+    current.type = 'button';
+    current.setAttribute('aria-pressed', 'true');
+    current.disabled = true;
+    const other = el('button', 'Otro navegador', 'btn-small btn-small--ghost');
+    other.type = 'button';
+    other.addEventListener('click', () => draw(null));
+    tabs.append(current, other);
+
+    const steps = el('p', chosen[1], 'install-help__steps');
+    steps.setAttribute('role', 'status');
+    panel.append(tabs, steps);
+  }
+
+  toggle.addEventListener('click', () => {
+    const opening = panel.hidden;
+    panel.hidden = !opening;
+    toggle.setAttribute('aria-expanded', String(opening));
+    if (opening) draw(null);
   });
-  return button;
+
+  wrapper.append(toggle, panel);
+  return wrapper;
 }
 
 export function buildProtectionCard() {
@@ -269,18 +325,15 @@ export function buildProtectionCard() {
   const backupLine = el('p', backupText(getBackupStatus()), 'card__total');
   card.append(persistLine, spaceLine, installLine, vaultLine, backupLine);
 
-  // Instalada o no
+  // Instalada o no (los pasos salen con el botón "Cómo instalar en…")
+  const showInstallHelp = !isInstalled() && (isIPhone() || isAndroid());
   if (isInstalled()) {
     installLine.textContent = 'App instalada: sí ✓';
-  } else if (isIPhone() || isAndroid()) {
-    installLine.textContent = `App instalada: no. Instálala para proteger mejor tus datos. ${installSteps()}`;
+  } else if (showInstallHelp) {
+    installLine.textContent = 'App instalada: no. Instálala para proteger mejor tus datos.';
   } else {
     installLine.hidden = true;
   }
-
-  const refreshBackupLine = () => {
-    backupLine.textContent = backupText(getBackupStatus());
-  };
 
   const requestButton = el('button', 'Pedir protección al navegador', 'btn-secondary');
   requestButton.type = 'button';
@@ -328,17 +381,12 @@ export function buildProtectionCard() {
   card.appendChild(
     el(
       'p',
-      'Importante: si borras los «datos del sitio» o los «datos de navegación» desde los ajustes del navegador, se pierde TODO, también la copia interna. Solo un PDF o Excel guardado fuera de la app te protege de eso. Borrar solo el caché no toca tus datos.',
+      'Importante: si borras los «datos del sitio» o los «datos de navegación» desde los ajustes del navegador, se pierde TODO, también la copia interna. Solo un PDF o Excel guardado fuera de la app (en Inicio > Descargar reporte) te protege de eso. Borrar solo el caché no toca tus datos.',
       'interest-preview'
     )
   );
 
   card.appendChild(requestButton);
-  const row = el('div', '', 'actions-row');
-  row.append(
-    backupDownloadButton('Respaldo en PDF', () => downloadPdf(), refreshBackupLine),
-    backupDownloadButton('Respaldo en Excel', () => downloadExcel(), refreshBackupLine)
-  );
-  card.appendChild(row);
+  if (showInstallHelp) card.appendChild(buildInstallHelp());
   return card;
 }

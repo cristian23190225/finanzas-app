@@ -15,6 +15,7 @@ import {
   newId,
   parseAmount,
   parsePercent,
+  roundMoney,
   todayISO,
 } from './utils.js';
 import { vaultClear, vaultRead, vaultSave } from './vault.js';
@@ -28,6 +29,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const CURRENT_VERSION = 1;
 const MAX_BACKUP_BYTES = 5 * 1024 * 1024; // 5 MB
 const MAX_PAYMENTS = 2000;
+const MAX_PERIODS = 100000; // tope de periodos cerrados (cobros/pagos) que se aceptan al leer datos
 
 // Tipos de movimiento permitidos. Los tres últimos los crean los
 // botones de "ya pagó" (préstamos) y "ya pagué" (deudas), para que el
@@ -59,7 +61,15 @@ function sanitizePayments(list) {
     const amount = parseAmount(item.amount);
     if (amount === null || !isValidISODate(item.date)) continue;
     // 'capital' = abono extra a capital; cualquier otra cosa = pago normal
-    result.push({ date: item.date, amount, kind: item.kind === 'capital' ? 'capital' : 'regular' });
+    const payment = { date: item.date, amount, kind: item.kind === 'capital' ? 'capital' : 'regular' };
+    // Cobros de interés de préstamos: cuántos cobros cubre el pago (0 = solo interés atrasado)
+    // y cuánto tocaba cobrar en total; si "expected" > "amount", la diferencia queda como interés atrasado.
+    if (Number.isInteger(item.periods) && item.periods >= 0 && item.periods <= MAX_PERIODS) payment.periods = item.periods;
+    // De qué parte fue: 'day' = el del día (o adelanto), 'late' = atrasado
+    if (item.part === 'day' || item.part === 'late') payment.part = item.part;
+    const expected = parseAmount(item.expected);
+    if (expected !== null && expected >= amount) payment.expected = expected;
+    result.push(payment);
   }
   return result;
 }
@@ -113,6 +123,24 @@ function sanitizeLoan(raw) {
         : addPeriods(raw.date, frequency, 1);
   }
 
+  // Atrasos y adelantos de los cobros de interés (ver arrears.js). Los préstamos guardados antes
+  // de existir esto se convierten: cada cobro marcado cierra un periodo y lo que faltó queda atrasado.
+  const interestPayments = hasInterest ? sanitizePayments(raw.interestPayments) : [];
+  let periodsClosed = 0;
+  let interestBacklog = 0;
+  let interestCredit = 0;
+  if (hasInterest) {
+    if (Number.isInteger(raw.periodsClosed) && raw.periodsClosed >= 0 && raw.periodsClosed <= MAX_PERIODS) {
+      periodsClosed = raw.periodsClosed;
+      interestBacklog = optionalAmount(raw.interestBacklog);
+      interestCredit = optionalAmount(raw.interestCredit);
+    } else {
+      periodsClosed = Math.min(MAX_PERIODS, interestPayments.reduce((sum, p) => sum + (p.periods ?? 1), 0));
+      const last = [...interestPayments].reverse().find((p) => p.expected !== undefined);
+      interestBacklog = last ? roundMoney(Math.max(0, last.expected - last.amount)) : 0;
+    }
+  }
+
   return {
     id: raw.id,
     person,
@@ -122,7 +150,10 @@ function sanitizeLoan(raw) {
     rate,
     frequency,
     firstPaymentDate, // primer día de cobro de interés ('' si no hay interés)
-    interestPayments: hasInterest ? sanitizePayments(raw.interestPayments) : [],
+    interestPayments,
+    periodsClosed, // periodos de interés ya cerrados (cobrados o pasados a atrasado)
+    interestBacklog, // dinero de interés atrasado
+    interestCredit, // dinero a favor por cobros adelantados
     principalPayments: sanitizePayments(raw.principalPayments), // capital que ya te devolvieron
   };
 }
@@ -166,6 +197,20 @@ function sanitizeDebt(raw) {
   const rawRate = Number(raw.periodRate);
   const periodRate = Number.isFinite(rawRate) && rawRate > 0 && rawRate <= 1 ? rawRate : 0;
 
+  // Atrasos y adelantos de pagos (ver arrears.js). Las deudas guardadas antes de existir esto se convierten:
+  // cada pago normal marcado cierra un periodo.
+  const payments = sanitizePayments(raw.payments);
+  let periodsClosed;
+  let backlog = 0;
+  let credit = 0;
+  if (Number.isInteger(raw.periodsClosed) && raw.periodsClosed >= 0 && raw.periodsClosed <= MAX_PERIODS) {
+    periodsClosed = raw.periodsClosed;
+    backlog = optionalAmount(raw.backlog);
+    credit = optionalAmount(raw.credit);
+  } else {
+    periodsClosed = Math.min(MAX_PERIODS, payments.reduce((sum, p) => sum + (p.kind === 'capital' ? 0 : p.periods ?? 1), 0));
+  }
+
   return {
     id: raw.id,
     concept,
@@ -178,7 +223,10 @@ function sanitizeDebt(raw) {
     periodRate,
     settleAmount,
     settleDate, // día en que se anotó el monto de "liquidar hoy"
-    payments: sanitizePayments(raw.payments),
+    payments,
+    periodsClosed, // periodos ya cerrados (pagados o pasados a atrasado)
+    backlog, // dinero atrasado
+    credit, // dinero a favor por pagos adelantados
   };
 }
 

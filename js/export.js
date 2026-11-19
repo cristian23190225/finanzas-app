@@ -135,9 +135,9 @@ function buildReport(period = null) {
     summary: [
       ['Disponible para gastar', getAvailableIncome()],
       ['Ahorro actual', getSavingBalance()],
-      ['Debo en total', owe],
-      ['Me deben en total', owed],
-      ['Intereses cobrados (ganancia)', interestEarned],
+      ['Total por pagar (deudas)', owe],
+      ['Total por cobrar (préstamos)', owed],
+      ['Intereses cobrados (tu ganancia)', interestEarned],
     ],
     months: buildMonths(allMovements, today).filter((row) => !periodKey || row.key === periodKey),
     movements: movements.map((m) => ({
@@ -156,8 +156,9 @@ function buildReport(period = null) {
       balance: info.balance,
       remaining: info.remaining,
       nextDue: info.balance > 0 ? info.nextDue : '',
-      pending: info.balance > 0 ? info.pending : 0,
-      status: info.balance > 0 ? (info.pending > 0 ? 'Pago vencido' : 'Al corriente') : 'Liquidada',
+      lateCount: info.balance > 0 ? info.lateCount : 0, // pagos atrasados
+      backlog: info.balance > 0 ? info.backlog : 0, // dinero atrasado
+      status: info.balance > 0 ? (info.isLate ? 'Pago atrasado' : 'Al corriente') : 'Liquidada',
     })),
     loans: loans.map(({ loan, info }) => ({
       person: loan.person,
@@ -169,7 +170,8 @@ function buildReport(period = null) {
       outstanding: info.outstanding,
       interestCollected: info.interestCollected,
       nextDue: loan.hasInterest && info.outstanding > 0 ? info.nextDue : '',
-      status: info.outstanding > 0 ? (info.pending > 0 ? 'Cobro vencido' : 'Activo') : 'Cobrado',
+      interestOverdue: info.interestOverdue,
+      status: info.outstanding > 0 ? (info.backlog > 0 || (info.dayOpen && info.nextDue < today) ? 'Cobro atrasado' : 'Activo') : 'Cobrado',
     })),
   };
 }
@@ -313,7 +315,7 @@ async function buildPdf(report) {
     emptyNote('No hay deudas registradas.');
   } else {
     table(
-      ['Concepto', 'Total', 'Pago', 'Frecuencia', 'Pagado', 'Falta pagar', 'Próximo pago', 'Estado'],
+      ['Concepto', 'Total', 'Pago', 'Frecuencia', 'Pagado', 'Falta pagar', 'Atrasado', 'Próximo pago', 'Estado'],
       report.debts.map((d) => [
         d.concept,
         formatMoney(d.total),
@@ -321,12 +323,13 @@ async function buildPdf(report) {
         d.frequency,
         formatMoney(d.paid),
         formatMoney(d.remaining),
+        formatMoney(d.backlog),
         d.nextDue ? formatShortDate(d.nextDue) : '-',
         d.status,
       ]),
       {
-        columnStyles: { 1: right, 2: right, 4: right, 5: right },
-        didParseCell: (d) => d.section === 'head' && [1, 2, 4, 5].includes(d.column.index) && (d.cell.styles.halign = 'right'),
+        columnStyles: { 1: right, 2: right, 4: right, 5: right, 6: right },
+        didParseCell: (d) => d.section === 'head' && [1, 2, 4, 5, 6].includes(d.column.index) && (d.cell.styles.halign = 'right'),
       }
     );
   }
@@ -337,7 +340,7 @@ async function buildPdf(report) {
     emptyNote('No hay préstamos registrados.');
   } else {
     table(
-      ['Persona', 'Fecha', 'Prestado', 'Interés', 'Recuperado', 'Me deben', 'Interés cobrado', 'Estado'],
+      ['Persona', 'Fecha', 'Prestado', 'Interés', 'Cobrado', 'Falta por cobrar', 'Interés cobrado', 'Intereses vencidos', 'Estado'],
       report.loans.map((l) => [
         l.person,
         formatShortDate(l.date),
@@ -346,11 +349,12 @@ async function buildPdf(report) {
         formatMoney(l.recovered),
         formatMoney(l.outstanding),
         formatMoney(l.interestCollected),
+        formatMoney(l.interestOverdue),
         l.status,
       ]),
       {
-        columnStyles: { 2: right, 4: right, 5: right, 6: right },
-        didParseCell: (d) => d.section === 'head' && [2, 4, 5, 6].includes(d.column.index) && (d.cell.styles.halign = 'right'),
+        columnStyles: { 2: right, 4: right, 5: right, 6: right, 7: right },
+        didParseCell: (d) => d.section === 'head' && [2, 4, 5, 6, 7].includes(d.column.index) && (d.cell.styles.halign = 'right'),
       }
     );
   }
@@ -437,7 +441,7 @@ async function buildExcel(report) {
 
   // Hoja 3: Deudas
   const debtRows = [
-    [head('Concepto'), head('Total a pagar', 'right'), head('Pago', 'right'), head('Frecuencia'), head('Pagado', 'right'), head('Capital pendiente', 'right'), head('Falta por pagar', 'right'), head('Próximo pago'), head('Pagos vencidos', 'right'), head('Estado')],
+    [head('Concepto'), head('Total a pagar', 'right'), head('Pago', 'right'), head('Frecuencia'), head('Pagado', 'right'), head('Capital pendiente', 'right'), head('Falta pagar', 'right'), head('Atrasado', 'right'), head('Próximo pago'), head('Pagos atrasados', 'right'), head('Estado')],
     ...(report.debts.length === 0 ? [[text('No hay deudas registradas.')]] : []),
     ...report.debts.map((d) => [
       text(d.concept),
@@ -447,15 +451,16 @@ async function buildExcel(report) {
       money(d.paid),
       money(d.balance),
       money(d.remaining),
+      money(d.backlog),
       date(d.nextDue),
-      { value: d.pending, type: Number },
+      { value: d.lateCount, type: Number },
       text(d.status),
     ]),
   ];
 
   // Hoja 4: Préstamos
   const loanRows = [
-    [head('Persona'), head('Fecha'), head('Prestado', 'right'), head('Interés %', 'right'), head('Cobro de interés'), head('Recuperado', 'right'), head('Me deben', 'right'), head('Interés cobrado', 'right'), head('Próximo cobro'), head('Estado')],
+    [head('Persona'), head('Fecha'), head('Prestado', 'right'), head('Interés %', 'right'), head('Cobro de interés'), head('Cobrado', 'right'), head('Falta por cobrar', 'right'), head('Interés cobrado', 'right'), head('Intereses vencidos', 'right'), head('Próximo cobro'), head('Estado')],
     ...(report.loans.length === 0 ? [[text('No hay préstamos registrados.')]] : []),
     ...report.loans.map((l) => [
       text(l.person),
@@ -466,6 +471,7 @@ async function buildExcel(report) {
       money(l.recovered),
       money(l.outstanding),
       money(l.interestCollected),
+      money(l.interestOverdue),
       date(l.nextDue),
       text(l.status),
     ]),
@@ -482,8 +488,8 @@ async function buildExcel(report) {
   const sheets = [
     { sheet: 'Resumen', data: summaryRows, columns: widths([30, 18, 18, 18, 22]), stickyRowsCount: 1 },
     { sheet: 'Movimientos', data: movementRows, columns: widths([13, 20, 32, 16, 20]), stickyRowsCount: 1 },
-    { sheet: 'Deudas', data: debtRows, columns: widths([28, 16, 14, 16, 14, 18, 18, 14, 14, 14]), stickyRowsCount: 1 },
-    { sheet: 'Préstamos', data: loanRows, columns: widths([24, 13, 14, 11, 18, 14, 14, 16, 14, 14]), stickyRowsCount: 1 },
+    { sheet: 'Deudas', data: debtRows, columns: widths([28, 16, 14, 16, 14, 18, 18, 16, 14, 16, 14]), stickyRowsCount: 1 },
+    { sheet: 'Préstamos', data: loanRows, columns: widths([24, 13, 14, 11, 18, 14, 14, 16, 18, 14, 22]), stickyRowsCount: 1 },
     { sheet: BACKUP_SHEET, data: backupRows, columns: widths([60]) },
   ];
 

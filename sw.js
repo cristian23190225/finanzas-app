@@ -17,7 +17,7 @@
    agrégalo también a la lista FILES de abajo.
    ========================================================= */
 
-const VERSION = 12;
+const VERSION = 15;
 
 const CACHE_PREFIX = 'finanzas-app-';
 const CACHE_NAME = `${CACHE_PREFIX}v${VERSION}`;
@@ -49,6 +49,7 @@ const FILES = [
   'js/home.js',
   'js/cards.js',
   'js/money-input.js',
+  'js/arrears.js',
   'js/vault.js',
   'js/protect.js',
   'lib/jspdf.umd.min.js',

@@ -10,9 +10,17 @@
      El interés de cada periodo es un porcentaje del capital que
      TODAVÍA te deben. Si te devuelven una parte del capital, el
      interés por cobro baja.
+
+   COBROS ATRASADOS Y ADELANTADOS (ver arrears.js):
+     - "Interés del día" = el cobro del periodo más reciente. Al cobrarlo,
+       el próximo cobro salta al siguiente periodo aunque haya atrasos.
+     - "Interés atrasado" = dinero de cobros que no se hicieron. Cobrarlo
+       NO mueve la fecha del próximo cobro.
+     - Si te dan más del cobro estando al día, se adelantan periodos.
    ========================================================= */
 
 import { buildEmpty, buildHero, buildProgress, buildStats, buildViewHeader } from './cards.js';
+import { MAX_AHEAD, maxDayAmount, payDay, payLate, settle, view } from './arrears.js';
 import { activeDate } from './calendar.js';
 import { addItem, getItems, removeItem, updateItem } from './storage.js';
 import { getAvailableIncome, hasEnoughIncome, notEnoughIncomeMessage, updateDisplays } from './transactions.js';
@@ -62,18 +70,53 @@ export function describeLoan(loan, today = todayISO()) {
   const outstanding = roundMoney(Math.max(0, loan.amount - recovered));
   const interestCollected = roundMoney(loan.interestPayments.reduce((sum, p) => sum + p.amount, 0));
 
-  let nextDue = '';
-  let pending = 0;
-  let interestNext = 0;
-  if (loan.hasInterest) {
-    nextDue = addPeriods(loan.firstPaymentDate, loan.frequency, loan.interestPayments.length);
-    // Cobros que ya vencieron y todavía no marcas
-    pending = Math.max(0, countDue(loan.firstPaymentDate, loan.frequency, today) - loan.interestPayments.length);
-    // Interés del próximo cobro: sobre el capital que todavía te deben (mínimo 1 centavo)
-    if (outstanding > 0) interestNext = Math.max(0.01, interestPerPeriod(outstanding, loan.rate));
+  const base = {
+    recovered,
+    outstanding,
+    interestCollected,
+    nextDue: '',
+    pending: 0, // cobros por cobrar ya vencidos (atrasados + el del día)
+    interestNext: 0, // interés de cada cobro
+    interestOverdue: 0, // todo lo que ya debió pagarte: atrasado + el del día
+    backlog: 0, // dinero de interés atrasado
+    lateCount: 0, // cuántos cobros son (atrasado ÷ interés por cobro, hacia arriba)
+    full: 0, // cobros completos dentro de lo atrasado
+    rest: 0, // y el sobrante (un cobro más, de menos dinero)
+    credit: 0, // dinero a favor por cobros adelantados
+    dayOpen: false, // ¿el cobro del día todavía no se cobra?
+    dayDue: 0, // cuánto toca del cobro del día
+    ahead: 0, // periodos ya cobrados por adelantado
+    overdueSince: '', // desde cuándo hay atraso (si se conoce)
+  };
+  if (!loan.hasInterest) return base;
+
+  // Interés de cada cobro: sobre el capital que todavía te deben (mínimo 1 centavo)
+  const interestNext = outstanding > 0 ? Math.max(0.01, interestPerPeriod(outstanding, loan.rate)) : 0;
+  const state = { closed: loan.periodsClosed, backlog: loan.interestBacklog, credit: loan.interestCredit };
+
+  if (interestNext === 0) {
+    // Ya no te deben capital: solo puede quedar interés atrasado
+    return { ...base, nextDue: addPeriods(loan.firstPaymentDate, loan.frequency, state.closed), backlog: state.backlog, interestOverdue: state.backlog };
   }
 
-  return { recovered, outstanding, interestCollected, nextDue, pending, interestNext };
+  const elapsed = countDue(loan.firstPaymentDate, loan.frequency, today); // periodos que ya vencieron
+  const v = view(state, elapsed, interestNext);
+  return {
+    ...base,
+    nextDue: addPeriods(loan.firstPaymentDate, loan.frequency, v.nextIndex),
+    pending: v.lateCount + (v.dayDue > 0 ? 1 : 0),
+    interestNext,
+    interestOverdue: roundMoney(v.backlog + v.dayDue),
+    backlog: v.backlog,
+    lateCount: v.lateCount,
+    full: v.full,
+    rest: v.rest,
+    credit: v.credit,
+    dayOpen: v.dayOpen,
+    dayDue: v.dayDue,
+    ahead: v.ahead,
+    overdueSince: v.oldestIndex === null ? '' : addPeriods(loan.firstPaymentDate, loan.frequency, v.oldestIndex),
+  };
 }
 
 /* =========================================================
@@ -265,20 +308,112 @@ function destinationField(defaultToIncome) {
   };
 }
 
+/** "cobro" o "cobros" según la cantidad. */
+function plural(n, one, many) {
+  return n === 1 ? one : many;
+}
+
+/** "3 de $200.00 + 1 de $150.00": de qué cobros se forma lo atrasado. */
+function lateBreakdown(v, per) {
+  const parts = [];
+  if (v.full > 0) parts.push(`${v.full} de ${formatMoney(per)}`);
+  if (v.rest > 0) parts.push(`1 de ${formatMoney(v.rest)}`);
+  return parts.join(' + ');
+}
+
+/** Estado en el formato de arrears.js. */
+function loanState(loan) {
+  return { closed: loan.periodsClosed, backlog: loan.interestBacklog, credit: loan.interestCredit };
+}
+
+/**
+ * Antes de bajar el capital, los cobros vencidos que no se cobraron pasan a "atrasado"
+ * con el interés de ANTES (así no cambian de precio cuando baja el capital).
+ */
+function settledInterest(loan, info) {
+  if (!loan.hasInterest || info.interestNext <= 0) return {};
+  const s = settle(loanState(loan), countDue(loan.firstPaymentDate, loan.frequency, todayISO()), info.interestNext);
+  return { periodsClosed: s.closed, interestBacklog: s.backlog, interestCredit: s.credit };
+}
+
 function openInterestDialog(loan, container, defaultToIncome) {
+  if (!loan.hasInterest) return;
   const info = describeLoan(loan);
-  if (!loan.hasInterest || info.outstanding <= 0) return;
+  if (info.outstanding <= 0) return;
+
+  const per = info.interestNext;
+  const elapsed = countDue(loan.firstPaymentDate, loan.frequency, todayISO()); // periodos que ya vencieron
+  const state = loanState(loan);
+  const maxDay = maxDayAmount(state, elapsed, per);
+  const canDay = maxDay >= 0.01; // el del día, o adelantar el siguiente
+  const canLate = info.backlog >= 0.01;
+  if (!canDay && !canLate) {
+    showToast('Este préstamo no tiene intereses por cobrar.');
+    return;
+  }
+
+  // Lo que toca del cobro del día (o del siguiente, si el del día ya está cobrado)
+  const dayDefault = info.dayOpen ? info.dayDue : roundMoney(Math.max(0.01, per - info.credit));
+  let mode = canDay ? 'day' : 'late';
+  const defaultFor = (m) => (m === 'day' ? dayDefault : info.backlog);
+  const maxFor = (m) => (m === 'day' ? maxDay : info.backlog);
 
   const { dialog, form } = createDialog();
-
   form.appendChild(el('h2', `Cobrar interés: ${loan.person}`));
 
-  let intro = `Te debe ${formatMoney(info.outstanding)} y le cobras ${loan.rate}% ${FREQUENCY_PHRASE[loan.frequency]}.`;
-  if (info.pending > 1) {
-    intro += ` Tienes ${info.pending} cobros vencidos: se marcan de uno en uno.`;
+  const intro = [`Te debe ${formatMoney(info.outstanding)} y le cobras ${loan.rate}% ${FREQUENCY_PHRASE[loan.frequency]}: ${formatMoney(per)} por cobro.`];
+  if (info.backlog > 0) {
+    intro.push(`Atrasado: ${formatMoney(info.backlog)} (${info.lateCount} ${plural(info.lateCount, 'cobro', 'cobros')}: ${lateBreakdown(info, per)}).`);
   }
-  form.appendChild(el('p', intro, 'card__total'));
-  form.appendChild(el('p', `Vas a cobrar ${formatMoney(info.interestNext)} de interés.`, 'interest-preview'));
+  if (!info.dayOpen && info.backlog <= 0) intro.push('Va al corriente: lo que cobres se adelanta al siguiente cobro.');
+  if (info.ahead > 0) intro.push(`Va adelantado ${info.ahead} ${plural(info.ahead, 'cobro', 'cobros')}.`);
+  if (info.credit > 0) intro.push(`Tiene ${formatMoney(info.credit)} a su favor.`);
+  form.appendChild(el('p', intro.join(' '), 'card__total'));
+
+  // ¿Qué cobraste? (solo si hay las dos opciones)
+  const choice = document.createElement('fieldset');
+  choice.className = 'choice-group';
+  if (canDay && canLate) {
+    choice.appendChild(el('legend', '¿Qué cobraste?'));
+    const dayText = info.dayOpen
+      ? `Interés del día · ${formatMoney(dayDefault)}`
+      : `Interés del próximo cobro, por adelantado · ${formatMoney(dayDefault)}`;
+    for (const [value, text] of [
+      ['day', dayText],
+      ['late', `Interés atrasado · ${formatMoney(info.backlog)}`],
+    ]) {
+      const label = document.createElement('label');
+      label.className = 'choice';
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'mode';
+      input.value = value;
+      input.checked = value === mode;
+      input.addEventListener('change', () => {
+        mode = value;
+        amountInput.value = formatAmountText(String(defaultFor(mode)));
+        updatePreview();
+      });
+      label.append(input, el('span', text));
+      choice.appendChild(label);
+    }
+  } else {
+    choice.hidden = true;
+  }
+
+  const amountLabel = document.createElement('label');
+  amountLabel.appendChild(document.createTextNode('¿Cuánto te dio?'));
+  const amountInput = document.createElement('input');
+  amountInput.name = 'amount';
+  amountInput.type = 'text';
+  amountInput.inputMode = 'decimal';
+  amountInput.setAttribute('data-money', '');
+  amountInput.autocomplete = 'off';
+  amountInput.value = formatAmountText(String(defaultFor(mode)));
+  amountLabel.appendChild(amountInput);
+
+  const previewMain = el('p', '', 'interest-preview');
+  const previewMore = el('p', '', 'card__total');
 
   const dest = destinationField(defaultToIncome);
 
@@ -291,25 +426,97 @@ function openInterestDialog(loan, container, defaultToIncome) {
   cancelButton.type = 'button';
   cancelButton.addEventListener('click', () => dialog.close());
 
-  form.append(dest.field, errorBox, saveButton, cancelButton);
+  form.append(choice, amountLabel, previewMain, previewMore, dest.field, errorBox, saveButton, cancelButton);
 
   const fail = (message) => {
     errorBox.textContent = message;
   };
 
+  /** Mensaje cuando escribes más de lo permitido. */
+  const tooMuchMessage = () =>
+    mode === 'day'
+      ? `Solo puedes cobrar hasta ${formatMoney(maxDay)} (el cobro y ${MAX_AHEAD} por adelantado).`
+      : `No puede ser más de lo que debe de atrasado (${formatMoney(info.backlog)}).`;
+
+  /** Qué pasa con lo que te dieron: el nuevo estado, lo que pasa a atrasado y cuántos cobros se adelantan. */
+  function outcome(amount) {
+    if (mode === 'late') return { r: payLate(state, elapsed, per, amount), short: 0, adv: 0 };
+    const s = settle(state, elapsed, per);
+    const r = payDay(state, elapsed, per, amount);
+    return {
+      r,
+      short: roundMoney(Math.max(0, r.backlog - s.backlog)), // lo que faltó del cobro del día
+      adv: Math.max(0, r.closed - Math.max(elapsed, state.closed)), // periodos que se adelantan
+    };
+  }
+
+  /** Explica cómo quedaría el préstamo con lo que escribiste. */
+  function updatePreview() {
+    errorBox.textContent = '';
+    previewMore.hidden = false;
+    const given = parseAmount(amountInput.value);
+    if (given === null) {
+      previewMain.textContent = 'Escribe cuánto te dio.';
+      previewMore.hidden = true;
+      return;
+    }
+    if (given > maxFor(mode) + EPS) {
+      previewMain.textContent = tooMuchMessage();
+      previewMore.hidden = true;
+      return;
+    }
+
+    const { r, short, adv } = outcome(roundMoney(given));
+    const after = view({ closed: r.closed, backlog: r.backlog, credit: r.credit }, elapsed, per);
+    const lines = [];
+
+    if (mode === 'late') {
+      previewMain.textContent =
+        after.backlog > 0
+          ? `Te seguirá debiendo ${formatMoney(after.backlog)} de atrasado (${after.lateCount} ${plural(after.lateCount, 'cobro', 'cobros')}: ${lateBreakdown(after, per)}).`
+          : 'Con esto ya no debe nada atrasado.';
+      lines.push(`La fecha del próximo cobro no cambia: ${formatShortDate(addPeriods(loan.firstPaymentDate, loan.frequency, after.nextIndex))}.`);
+    } else {
+      if (short > 0) previewMain.textContent = `Es menos de lo que toca (${formatMoney(dayDefault)}): ${formatMoney(short)} pasan a interés atrasado.`;
+      else if (adv > 0) previewMain.textContent = `Con eso adelantas ${adv} ${plural(adv, 'cobro', 'cobros')}.`;
+      else if (r.closed === state.closed && r.credit > 0) previewMain.textContent = 'Queda a tu favor para el siguiente cobro.';
+      else previewMain.textContent = info.dayOpen ? 'Cobras el interés del día completo.' : 'Cobras el siguiente interés por adelantado.';
+
+      if (after.credit > 0 && (adv > 0 || r.closed !== state.closed)) {
+        lines.push(`Sobran ${formatMoney(after.credit)}: quedan a tu favor para el siguiente cobro.`);
+      }
+      lines.push(`Próximo cobro: ${formatShortDate(addPeriods(loan.firstPaymentDate, loan.frequency, after.nextIndex))}.`);
+      if (after.backlog > 0) {
+        lines.push(`Atrasado: ${formatMoney(after.backlog)} (${after.lateCount} ${plural(after.lateCount, 'cobro', 'cobros')}).`);
+      }
+    }
+    previewMore.textContent = lines.join(' ');
+  }
+  amountInput.addEventListener('input', updatePreview);
+  updatePreview();
+
   form.addEventListener('submit', (event) => {
     event.preventDefault();
 
-    const amount = info.interestNext;
+    const given = parseAmount(amountInput.value);
+    if (given === null) return fail('Escribe cuánto te dio (mínimo $0.01).');
+    if (given > maxFor(mode) + EPS) return fail(tooMuchMessage());
+
+    const amount = Math.min(roundMoney(given), maxFor(mode));
+    const { r, short, adv } = outcome(amount);
     const toIncome = dest.getValue() === 'income';
     const toSavings = dest.getValue() === 'savings';
     const today = activeDate(); // hoy, o el día pasado que elegiste en el calendario
+
+    let detail = loan.person;
+    if (mode === 'late') detail = `${loan.person} · interés atrasado`;
+    else if (adv > 0) detail = `${loan.person} · adelanto`;
 
     // 1) Movimiento del cobro en el historial
     const movement = addItem('transactions', {
       type: 'cobro_interes',
       amount,
-      note: loan.person,
+      note: detail,
       date: today,
       fromIncome: toIncome, // solo suma a ingresos si elegiste "ingresos"
     });
@@ -331,9 +538,12 @@ function openInterestDialog(loan, container, defaultToIncome) {
       }
     }
 
-    // 3) Se anota el cobro en el préstamo
+    // 3) Se anota el cobro en el préstamo con su nuevo estado de atrasos
     const saved = updateItem('loans', loan.id, {
-      interestPayments: [...loan.interestPayments, { date: today, amount, kind: 'regular' }],
+      interestPayments: [...loan.interestPayments, { date: today, amount, kind: 'regular', part: mode }],
+      periodsClosed: r.closed,
+      interestBacklog: r.backlog,
+      interestCredit: r.credit,
     });
     if (saved === null) {
       removeItem('transactions', movement.id); // deshacer los pasos anteriores
@@ -348,7 +558,11 @@ function openInterestDialog(loan, container, defaultToIncome) {
     let note = '';
     if (toIncome) note = ' (sumado a tus ingresos)';
     else if (toSavings) note = ' (agregado a tus ahorros)';
-    showToast(`Interés cobrado: ${formatMoney(amount)}${note}.`);
+    let message = mode === 'late' ? `Interés atrasado cobrado: ${formatMoney(amount)}${note}.` : `Interés cobrado: ${formatMoney(amount)}${note}.`;
+    if (mode === 'late') message += r.backlog > 0 ? ` Te quedan debiendo ${formatMoney(r.backlog)} de atrasado.` : ' Ya no debe nada atrasado.';
+    else if (short > 0) message += ` ${formatMoney(short)} pasan a interés atrasado.`;
+    else if (adv > 0) message += ` Adelantaste ${adv} ${plural(adv, 'cobro', 'cobros')}.`;
+    showToast(message);
   });
 
   document.body.appendChild(dialog);
@@ -437,8 +651,8 @@ function openPrincipalDialog(loan, container, defaultToIncome) {
     const left = roundMoney(info.outstanding - amount);
     if (left < EPS) {
       let text = 'Con esto termina el préstamo.';
-      if (loan.hasInterest && info.pending > 0) {
-        text += ` Tienes ${info.pending} cobro${info.pending === 1 ? '' : 's'} de interés sin marcar: se descartan al cerrar.`;
+      if (loan.hasInterest && info.interestOverdue > 0) {
+        text += ` Tienes ${formatMoney(info.interestOverdue)} de interés sin cobrar: se descartan al cerrar.`;
       }
       preview.textContent = text;
     } else {
@@ -503,6 +717,7 @@ function openPrincipalDialog(loan, container, defaultToIncome) {
       ? removeItem('loans', loan.id)
       : updateItem('loans', loan.id, {
           principalPayments: [...loan.principalPayments, { date: today, amount, kind: 'regular' }],
+          ...settledInterest(loan, info),
         }) !== null;
 
     if (!saved) {
@@ -535,18 +750,24 @@ function openPrincipalDialog(loan, container, defaultToIncome) {
    ========================================================= */
 
 /** Etiqueta de estado según cuándo toca cobrar. */
-function statusBadge(loan, info, today) {
-  if (!loan.hasInterest) return el('span', 'Sin interés', 'badge');
+function statusBadges(loan, info, today) {
+  if (!loan.hasInterest) return [el('span', 'Sin interés', 'badge')];
+
+  const badges = [];
+  if (info.backlog > 0) {
+    let text = `Atrasado: ${info.lateCount} ${info.lateCount === 1 ? 'cobro' : 'cobros'} · ${formatMoney(info.backlog)}`;
+    if (info.overdueSince) {
+      const late = -daysBetween(today, info.overdueSince);
+      if (late > 0) text = `Atrasado hace ${late} día${late === 1 ? '' : 's'} · ${info.lateCount} ${info.lateCount === 1 ? 'cobro' : 'cobros'} (${formatMoney(info.backlog)})`;
+    }
+    badges.push(el('span', text, 'badge badge--late'));
+  }
 
   const days = daysBetween(today, info.nextDue);
-  if (days < 0) {
-    const late = -days;
-    let text = `Cobro vencido hace ${late} día${late === 1 ? '' : 's'}`;
-    if (info.pending > 1) text += ` · ${info.pending} cobros pendientes`;
-    return el('span', text, 'badge badge--late');
-  }
-  if (days === 0) return el('span', 'Toca cobrar hoy', 'badge badge--today');
-  return el('span', `Faltan ${days} día${days === 1 ? '' : 's'}`, 'badge');
+  if (info.dayOpen && days < 0) badges.push(el('span', `Cobro del día: hace ${-days} día${days === -1 ? '' : 's'}`, 'badge badge--late'));
+  else if (days === 0) badges.push(el('span', 'Toca cobrar hoy', 'badge badge--today'));
+  else badges.push(el('span', `Faltan ${days} día${days === 1 ? '' : 's'}`, 'badge'));
+  return badges;
 }
 
 /** Una tarjeta por préstamo: lo que te deben, avance, datos clave y botones. */
@@ -554,7 +775,7 @@ function buildCard(loan, info, today, container) {
   const card = el('article', '', 'item-card');
 
   const head = el('div', '', 'item-card__head');
-  head.append(el('h2', loan.person, 'item-card__name'), statusBadge(loan, info, today));
+  head.append(el('h2', loan.person, 'item-card__name'), ...statusBadges(loan, info, today));
   card.appendChild(head);
 
   card.append(el('p', 'Falta por cobrar', 'item-card__label'), el('p', formatMoney(info.outstanding), 'item-card__amount'));
@@ -571,6 +792,14 @@ function buildCard(loan, info, today, container) {
       ['Próximo cobro', formatShortDate(info.nextDue)],
       ['Intereses cobrados', formatMoney(info.interestCollected)]
     );
+    // Lo que ya debió pagarte, separado en atrasado y adelantos
+    if (info.interestOverdue > 0) stats.push(['Intereses vencidos', formatMoney(info.interestOverdue)]);
+    if (info.backlog > 0) {
+      stats.push(['Interés atrasado', formatMoney(info.backlog)]);
+      stats.push(['Cobros atrasados', `${info.lateCount} (${lateBreakdown(info, info.interestNext)})`]);
+    }
+    if (info.ahead > 0) stats.push(['Cobros adelantados', String(info.ahead)]);
+    if (info.credit > 0) stats.push(['A su favor', formatMoney(info.credit)]);
   }
   card.appendChild(buildStats(stats));
 
@@ -631,7 +860,7 @@ export function renderLoans(container) {
 
   const totalOutstanding = roundMoney(rows.reduce((sum, r) => sum + r.info.outstanding, 0));
   // Intereses que ya debieron pagarte y todavía no marcas
-  const overdueInterest = roundMoney(rows.reduce((sum, r) => sum + r.info.pending * r.info.interestNext, 0));
+  const overdueInterest = roundMoney(rows.reduce((sum, r) => sum + r.info.interestOverdue, 0));
   container.appendChild(
     buildHero('Total por cobrar', formatMoney(totalOutstanding), [
       { label: 'Para gastar', value: formatMoney(getAvailableIncome()) },

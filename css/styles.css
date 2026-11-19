@@ -2103,6 +2103,54 @@ dialog h2[tabindex="-1"]:focus {
   min-width: 6.5rem;
 }
 
+/* ---- "Cómo instalar en…" (Ajustes > Protección de tus datos) ---- */
+.install-help {
+  margin-top: 0.75rem;
+}
+
+.install-help__panel {
+  margin-top: 0.6rem;
+}
+
+.browser-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.browser-tab {
+  min-height: 2.5rem;
+  padding: 0.4rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--input-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.browser-tab[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.browser-tab:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.install-help__steps {
+  margin: 0.7rem 0 0;
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
 /* =========================================================
    MODO OSCURO
    theme.js pone data-theme="dark" en <html>. Casi todo cambia solo

@@ -48,15 +48,26 @@ const TYPE_LABELS = {
 // El mes que se está viendo, con formato "AAAA-MM"
 let shownMonth = '';
 
-/* Íconos (Feather, MIT): cada uno es una lista de [forma, atributos] */
+/* Íconos: los mismos de los botones de Inicio (billete con +, bolsa, alcancía, tarjeta con !, mano con moneda).
+   Cada uno es una lista de [forma, atributos, hijos opcionales] */
 const SVG_NS = 'http://www.w3.org/2000/svg';
+const PIGGY_BODY = 'M19 10.5C18 8 15.3 6.5 12 6.5c-4 0-7 2.4-7 5.5 0 1.8 1 3.4 2.6 4.4V19h3v-1.5h2.8V19h3v-2.9c.5-.4.9-.9 1.3-1.4H21v-4h-1.5z';
 const ICONS = {
-  in: [['polyline', { points: '7 10 12 15 17 10' }], ['line', { x1: 12, y1: 15, x2: 12, y2: 3 }], ['path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }]],
-  out: [['polyline', { points: '17 8 12 3 7 8' }], ['line', { x1: 12, y1: 3, x2: 12, y2: 15 }], ['path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }]],
-  save: [['polyline', { points: '21 8 21 21 3 21 3 8' }], ['rect', { x: 1, y: 3, width: 22, height: 5 }], ['line', { x1: 10, y1: 12, x2: 14, y2: 12 }]],
-  back: [['path', { d: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4' }], ['polyline', { points: '16 17 21 12 16 7' }], ['line', { x1: 21, y1: 12, x2: 9, y2: 12 }]],
-  debt: [['rect', { x: 1, y: 4, width: 22, height: 16, rx: 2, ry: 2 }], ['line', { x1: 1, y1: 10, x2: 23, y2: 10 }]],
-  loan: [['line', { x1: 22, y1: 2, x2: 11, y2: 13 }], ['polygon', { points: '22 2 15 22 11 13 2 9 22 2' }]],
+  in: [['rect', { x: 2, y: 8, width: 16, height: 10, rx: 2 }], ['circle', { cx: 10, cy: 13, r: 2 }], ['path', { d: 'M19 2v6M16 5h6' }]],
+  out: [['path', { d: 'M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z' }], ['line', { x1: 3, y1: 6, x2: 21, y2: 6 }], ['path', { d: 'M16 10a4 4 0 0 1-8 0' }]],
+  save: [['path', { d: PIGGY_BODY }], ['path', { d: 'M10 9.5h3' }], ['path', { d: 'M16 12.5h.01' }]],
+  back: [
+    ['g', { transform: 'translate(2.4 5) scale(0.8)' }, [['path', { d: PIGGY_BODY }], ['path', { d: 'M16 12.5h.01' }]]],
+    ['path', { d: 'M12 6V1.5' }],
+    ['path', { d: 'M9.5 3.8 12 1.3l2.5 2.5' }],
+  ],
+  debt: [['rect', { x: 1.5, y: 3, width: 14, height: 10, rx: 2 }], ['line', { x1: 1.5, y1: 7, x2: 15.5, y2: 7 }], ['circle', { cx: 18, cy: 18, r: 4 }], ['path', { d: 'M18 16v2.2M18 20.2h.01' }]],
+  loan: [
+    ['circle', { cx: 15, cy: 6.5, r: 3.5 }],
+    ['path', { d: 'M2 14.5h3.5v6H2z' }],
+    ['path', { d: 'M5.5 16l3-1 5 .5a1.7 1.7 0 0 1 0 3.4H10' }],
+    ['path', { d: 'M5.5 19.5l7 1.5 7-3.5a1.7 1.7 0 0 0-2-2.7L14 15.5' }],
+  ],
 };
 
 // Qué ícono y color lleva cada tipo de movimiento
@@ -83,13 +94,19 @@ function iconBadge(iconName, tone) {
   svg.setAttribute('stroke-width', '2');
   svg.setAttribute('stroke-linecap', 'round');
   svg.setAttribute('stroke-linejoin', 'round');
-  for (const [shape, attributes] of ICONS[iconName] ?? []) {
-    const node = document.createElementNS(SVG_NS, shape);
-    for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, String(value));
-    svg.appendChild(node);
-  }
+  for (const [shape, attributes, children] of ICONS[iconName] ?? []) svg.appendChild(svgShape(shape, attributes, children));
   badge.appendChild(svg);
   return badge;
+}
+
+/** Dibuja una forma SVG (y las que lleve adentro, como en un grupo "g"). */
+function svgShape(shape, attributes, children = []) {
+  const node = document.createElementNS(SVG_NS, shape);
+  for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, String(value));
+  for (const [childShape, childAttributes, grandchildren] of children) {
+    node.appendChild(svgShape(childShape, childAttributes, grandchildren));
+  }
+  return node;
 }
 
 /* =========================================================
@@ -244,7 +261,10 @@ function upcomingItems(today) {
   for (const debt of getItems('debts')) {
     const info = describeDebt(debt, today);
     if (info.balance > 0) {
-      items.push({ date: info.nextDue, title: `Pagar · ${debt.concept}`, amount: info.nextAmount, kind: 'out', icon: 'debt', tone: 'debt' });
+      items.push({ date: info.nextDue, title: `Pagar · ${debt.concept}`, amount: info.dayOpen ? info.dayDue : info.nextAmount, kind: 'out', icon: 'debt', tone: 'debt' });
+      if (info.backlog > 0) {
+        items.push({ date: info.overdueSince || today, title: `Pagos atrasados · ${debt.concept}`, amount: info.backlog, kind: 'out', icon: 'debt', tone: 'debt' });
+      }
     }
   }
 
@@ -252,7 +272,10 @@ function upcomingItems(today) {
     if (!loan.hasInterest) continue;
     const info = describeLoan(loan, today);
     if (info.outstanding > 0) {
-      items.push({ date: info.nextDue, title: `Cobrar interés · ${loan.person}`, amount: info.interestNext, kind: 'in', icon: 'loan', tone: 'loan' });
+      items.push({ date: info.nextDue, title: `Cobrar interés · ${loan.person}`, amount: info.dayOpen ? info.dayDue : roundMoney(Math.max(0.01, info.interestNext - info.credit)), kind: 'in', icon: 'loan', tone: 'loan' });
+      if (info.backlog > 0) {
+        items.push({ date: info.overdueSince || today, title: `Interés atrasado · ${loan.person}`, amount: info.backlog, kind: 'in', icon: 'loan', tone: 'loan' });
+      }
     }
   }
 
@@ -266,7 +289,7 @@ function debtStats(today) {
   return {
     count: debts.length,
     totalLeft: roundMoney(debts.reduce((sum, info) => sum + info.remaining, 0)),
-    overdue: debts.filter((info) => daysBetween(today, info.nextDue) < 0).length,
+    overdue: debts.filter((info) => info.isLate).length,
   };
 }
 
@@ -276,7 +299,7 @@ function loanStats(today) {
   return {
     count: loans.length,
     totalOwed: roundMoney(loans.reduce((sum, info) => sum + info.outstanding, 0)),
-    overdueInterest: roundMoney(loans.reduce((sum, info) => sum + info.pending * info.interestNext, 0)),
+    overdueInterest: roundMoney(loans.reduce((sum, info) => sum + info.interestOverdue, 0)),
   };
 }
 
